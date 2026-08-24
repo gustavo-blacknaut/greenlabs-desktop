@@ -1892,7 +1892,7 @@ h2 {
      let the panel take a share of the actual screen height instead of the
      fixed 260px sized for wider windows. */
   .call-grid {
-    grid-template-rows: 1fr minmax(240px, 40vh);
+    grid-template-rows: 1fr minmax(280px, 46vh);
   }
 
   .call-grid.streams-collapsed {

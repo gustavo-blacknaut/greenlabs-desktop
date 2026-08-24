@@ -967,6 +967,7 @@ function App() {
     const sampleRate = Number(resp.headers.get('X-Sample-Rate')) || 48000;
     const channels = Math.max(1, Number(resp.headers.get('X-Channels')) || 2);
 
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate });
     const dest = audioCtx.createMediaStreamDestination();
     // AudioWorkletNode runs on the realtime audio thread, so main-thread jank
     // (UI work, GC) can't turn into irregular packet timing - that was feeding
