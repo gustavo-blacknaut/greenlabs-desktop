@@ -16,6 +16,8 @@ servidor só serve para as pessoas se encontrarem.
 
 - [Como funciona](#como-funciona)
 - [Instalação](#instalação)
+- [Versão web (site)](#versão-web-site)
+- [Compartilhar tela: onde funciona](#compartilhar-tela-onde-funciona)
 - [Hospedando o servidor](#hospedando-o-servidor)
   - [Pelo aplicativo (mais simples)](#pelo-aplicativo-mais-simples)
   - [Pelo terminal](#pelo-terminal)
@@ -23,6 +25,7 @@ servidor só serve para as pessoas se encontrarem.
   - [1. Mesma rede (LAN)](#1-mesma-rede-lan)
   - [2. Radmin VPN / Hamachi](#2-radmin-vpn--hamachi)
   - [3. Túnel público (Cloudflare / ngrok)](#3-túnel-público-cloudflare--ngrok)
+  - [Atualizando um servidor que já estava rodando](#atualizando-um-servidor-que-já-estava-rodando)
   - [4. VPS](#4-vps)
 - [Por que um servidor no Brasil importa](#por-que-um-servidor-no-brasil-importa)
 - [Requisitos mínimos](#requisitos-mínimos)
@@ -85,6 +88,69 @@ npm run build:installer
 ```
 
 O `.exe` sai em `dist-installer/`.
+
+---
+
+## Versão web (site)
+
+O mesmo cliente roda no navegador, publicado por GitHub Pages a cada push na
+`main` (workflow em `.github/workflows/pages.yml`).
+
+Para ativar no seu fork: **Settings → Pages → Source: GitHub Actions**.
+
+### O que muda no navegador
+
+| Recurso | App Windows | Site |
+|---|---|---|
+| Assistir | ✅ | ✅ |
+| Câmera e microfone | ✅ | ✅ |
+| Compartilhar tela | ✅ | ✅ (só HTTPS) |
+| Áudio do sistema junto da tela | ✅ sem o Discord | ⚠️ tudo ou nada |
+| Hospedar servidor pelo app | ✅ | ❌ |
+
+O filtro que remove o Discord depende do WASAPI, que só existe no Windows. No
+navegador o que dá é a caixa nativa "compartilhar áudio", que envia o mix
+inteiro — incluindo o Discord — ou nada.
+
+### Atenção ao endereço do servidor
+
+Um site em HTTPS **não consegue abrir `ws://`** (mixed content). Então:
+
+| Origem do cliente | Servidor aceito |
+|---|---|
+| App Windows | `ws://` e `wss://` |
+| Site HTTPS | só `wss://` |
+| `http://localhost` (dev) | `ws://` e `wss://` |
+
+Na prática, quem usa o site precisa de um servidor com `wss://` — o jeito mais
+simples é ligar o túnel na aba **Hospedar**, que já entrega um endereço `wss://`.
+Servidor em rede local por IP só funciona pelo app.
+
+---
+
+## Compartilhar tela: onde funciona
+
+| Plataforma | Compartilhar tela | Motivo |
+|---|---|---|
+| App Windows | ✅ | `getDisplayMedia` + WASAPI |
+| Chrome/Edge/Firefox desktop (HTTPS) | ✅ | `getDisplayMedia` disponível |
+| Safari desktop | ✅ | `getDisplayMedia` disponível |
+| Qualquer navegador em HTTP | ❌ | exige secure context |
+| **Android (qualquer navegador)** | ❌ | `getDisplayMedia` não é implementado |
+| **App Android (WebView)** | ❌ | mesma limitação |
+| iOS / iPadOS Safari | ❌ | não implementado |
+
+O bloqueio no Android não é do WebView: o
+[caniuse](https://caniuse.com/mdn-api_mediadevices_getdisplaymedia) marca
+`getDisplayMedia` como não suportado em Chrome for Android, Android Browser e
+Samsung Internet. Captura de tela segue sendo um recurso de desktop na web.
+
+O Android **tem** como capturar a tela nativamente (`MediaProjection`), mas os
+frames ficam no lado nativo e a conexão WebRTC do app vive dentro do WebView.
+Ligar um no outro exigiria trocar o WebView por um cliente WebRTC nativo
+(`org.webrtc`) e reimplementar a sinalização em Java — não é um ajuste, é outro
+aplicativo. Por isso o cliente Android hoje é para assistir e participar com
+câmera e microfone.
 
 ---
 
@@ -221,6 +287,39 @@ npm run host -- --tunnel=ngrok
 
 > O túnel adiciona um salto na rota, então a latência sobe um pouco. Se todos
 > puderem usar Radmin VPN, ela tende a ficar melhor.
+
+### Atualizando um servidor que já estava rodando
+
+O servidor mudou nesta versão. Se você já tinha uma instância no ar:
+
+```bash
+cd greenlabs-live-streaming
+git pull
+npm install --omit=dev
+sudo systemctl restart greenlabs   # ou reinicie como você subiu
+```
+
+O que mudou:
+
+- `signaling.js` agora exporta `startSignaling()` além de rodar direto. Continua
+  funcionando com `node server/signaling.js` e com `PORT=...` do mesmo jeito.
+- Novos arquivos `server/tunnel.js` e `server/host.js` (opcionais para uma VPS —
+  são usados pelo `npm run host` e pela aba Hospedar do app).
+- **Correção no ping**: antes o servidor calculava a latência dos participantes
+  como `horárioDoServidor - horárioDoCliente`, o que na prática media a diferença
+  de relógio entre as máquinas, não a latência. Agora o cliente envia o RTT que
+  ele mesmo mediu e o servidor só repassa.
+
+Compatibilidade entre versões:
+
+| Combinação | Resultado |
+|---|---|
+| Cliente novo + servidor novo | ping correto |
+| Cliente antigo + servidor novo | conecta normal; o ping dos outros aparece como 0 |
+| Cliente novo + servidor antigo | conecta normal; ping dos outros continua errado |
+
+Ou seja, dá para atualizar servidor e clientes em qualquer ordem — nada quebra,
+só o ping dos participantes fica impreciso até os dois lados estarem atualizados.
 
 ### 4. VPS
 
