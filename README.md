@@ -28,6 +28,7 @@ servidor só serve para as pessoas se encontrarem.
 - [Requisitos mínimos](#requisitos-mínimos)
 - [Desenvolvimento](#desenvolvimento)
 - [Solução de problemas](#solução-de-problemas)
+- [Changelog](#changelog)
 - [Créditos](#créditos)
 
 ---
@@ -430,6 +431,10 @@ Nesta ordem: confirme que o firewall do Windows liberou a porta; teste
 LAN, use Radmin VPN ou um túnel em vez do IP local.
 
 ---
+
+## Changelog
+
+O que mudou em cada versão está no [CHANGELOG.md](CHANGELOG.md).
 
 ## Créditos
 
