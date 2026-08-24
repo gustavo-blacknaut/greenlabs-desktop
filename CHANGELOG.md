@@ -3,6 +3,24 @@
 Todas as mudanças notáveis do app desktop, por versão. Formato livre, em
 português, ligado aos [releases do GitHub](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases).
 
+## [0.2.3](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.2.3) — 2026-08-24
+
+- **Áudio sumiu de novo na 0.2.2 — regressão minha, corrigida.** Ao apertar
+  o buffer para reduzir o delay, a margem de descarte ficou em 40ms, abaixo
+  do tamanho natural das rajadas em que o áudio chega (o leitor HTTP acorda
+  com um bloco, não com uma amostra de cada vez). Resultado medido: contra
+  rajadas de 60ms, **só 66% do áudio tocava** — um terço era descartado no
+  instante em que chegava, e a saída ficava com buracos de silêncio.
+  Agora a margem parte de 40ms mas cresce sozinha até o dobro da maior
+  rajada observada: medido em 98–99% de aproveitamento com rajadas de 10ms,
+  60ms e 120ms, sem descarte, mantendo o delay baixo quando a entrega é
+  suave.
+- **Layout de celular refeito com abas.** Dividir uma tela de 375px entre o
+  palco e um painel de duas colunas deixava tudo pequeno demais. Agora uma
+  barra inferior alterna entre **Telas**, **Transmissões** e **Usuários**, e
+  a seção ativa ocupa a tela inteira (medido: 638px em vez de 309px). O
+  layout de desktop não muda.
+
 ## [0.2.2](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.2.2) — 2026-08-24
 
 - **Delay do áudio da tela reduzido.** Com o áudio realmente chegando no

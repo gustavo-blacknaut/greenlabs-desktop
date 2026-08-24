@@ -1893,7 +1893,15 @@ h2 {
   }
 }
 
-@media (max-width: 520px) {
+/* ============================================================
+   Bottom nav (phones only) - hidden everywhere else
+   ============================================================ */
+
+.mobile-nav {
+  display: none;
+}
+
+@media (max-width: 720px) {
   .titlebar-brand {
     display: none;
   }
@@ -1902,32 +1910,117 @@ h2 {
     padding: 14px;
   }
 
-  /* Phones fall into the same 900px bucket as tablets, which puts
-     Transmissões and Usuários side by side - fine at tablet widths, but on
-     a ~375-412px phone each column has no room left. Stack them back up and
-     let the panel take a share of the actual screen height instead of the
-     fixed 260px sized for wider windows. */
-  .call-grid {
-    grid-template-rows: 1fr minmax(280px, 46vh);
+  /* One section at a time instead of a split screen. Splitting a 375px-wide
+     phone between the stage and a two-column panel left every part too small
+     to use; the bottom nav swaps between them at full size instead. */
+  .call-grid,
+  .call-grid.streams-collapsed {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 0;
   }
 
-  .call-grid.streams-collapsed {
-    grid-template-rows: 1fr 56px;
+  .call-grid[data-mobile-tab="palco"] .streams-panel {
+    display: none;
+  }
+
+  .call-grid[data-mobile-tab="transmissoes"] .stage,
+  .call-grid[data-mobile-tab="usuarios"] .stage {
+    display: none;
+  }
+
+  .call-grid[data-mobile-tab="transmissoes"] .users-section,
+  .call-grid[data-mobile-tab="usuarios"] .streams-section {
+    display: none;
+  }
+
+  /* With tabs there's nothing to collapse into - the nav already does it. */
+  .collapse-toggle-btn,
+  .panel-reopen {
+    display: none;
+  }
+
+  .call-grid.streams-collapsed .streams-panel {
+    padding: 12px;
+    border-width: 1px;
   }
 
   .panel-sections-wrapper {
     flex-direction: column;
   }
 
-  .side-sub-section {
-    min-height: 96px;
+  .streams-panel {
+    border-radius: 16px;
+    /* The 900px breakpoint caps the panel at 38vh because there it shares the
+       screen with the stage. In the tabbed layout it's alone on screen, so
+       that cap just wastes the bottom half. */
+    max-height: none;
   }
 
-  /* The action icons (transmit tela / camera / config) end up clustered
-     tight against the connect button and ping pill on a phone-width header
-     - justify-content: space-between leaves the slack in the middle instead
-     of between them. A bit more gap keeps them from reading as glued
-     together. */
+  .mobile-nav {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 6px;
+    margin-top: 10px;
+    padding: 6px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--panel);
+    backdrop-filter: blur(16px);
+  }
+
+  .mobile-nav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 9px 4px;
+    border: none;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+
+  .mobile-nav-btn.active {
+    color: var(--green);
+    background: var(--green-soft);
+  }
+
+  .mobile-nav-icon {
+    position: relative;
+    display: grid;
+    place-items: center;
+  }
+
+  .mobile-nav-badge {
+    position: absolute;
+    top: -5px;
+    right: -9px;
+    min-width: 15px;
+    height: 15px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: var(--green);
+    color: #03140b;
+    font-size: 0.6rem;
+    font-weight: 900;
+    display: grid;
+    place-items: center;
+  }
+
+  .mobile-nav-label {
+    white-space: nowrap;
+  }
+
+  /* The action icons end up clustered tight against the connect button and
+     ping pill at phone widths - space-between leaves the slack in the middle
+     instead of between them. */
   .actions {
     gap: 11px;
   }

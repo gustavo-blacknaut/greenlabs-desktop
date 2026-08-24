@@ -564,6 +564,10 @@ function App() {
   const [pickerSources, setPickerSources] = useState(null);
   const [pickerTab, setPickerTab] = useState('screens');
   const [streamsPanelCollapsed, setStreamsPanelCollapsed] = useState(false);
+  // Phone layout shows one section at a time via the bottom nav instead of
+  // splitting the screen - there isn't room for both at 375px wide. The
+  // desktop layout ignores this entirely (see the media query in styles.css).
+  const [mobileTab, setMobileTab] = useState('palco');
   const [onboarded, setOnboarded] = useState(() => {
     try { return localStorage.getItem('greenlabs:onboarded') === '1'; } catch { return true; }
   });
@@ -1939,7 +1943,7 @@ function App() {
           </div>
         )}
 
-        <div className={`call-grid ${streamsPanelCollapsed ? 'streams-collapsed' : ''}`}>
+        <div className={`call-grid ${streamsPanelCollapsed ? 'streams-collapsed' : ''}`} data-mobile-tab={mobileTab}>
           <div className="stage" ref={stageRef}>
             {streamsPanelCollapsed && (
               <button className="panel-reopen" title="Expandir painel" onClick={() => setStreamsPanelCollapsed(false)}>
@@ -2022,7 +2026,7 @@ function App() {
               </div>
             ) : (
               <div className="panel-sections-wrapper">
-                <section className="side-sub-section">
+                <section className="side-sub-section streams-section">
                   <div className="section-title-bar">
                     <MonitorIcon size={14} />
                     <span>Transmissões ({streams.length})</span>
@@ -2047,7 +2051,7 @@ function App() {
                   </div>
                 </section>
 
-                <section className="side-sub-section">
+                <section className="side-sub-section users-section">
                   <div className="section-title-bar">
                     <UsersIcon size={14} />
                     <span>Usuários ({totalPeople})</span>
@@ -2075,6 +2079,26 @@ function App() {
             )}
           </aside>
         </div>
+
+        <nav className="mobile-nav">
+          {[
+            { id: 'palco', label: 'Telas', Icon: MonitorIcon, count: null },
+            { id: 'transmissoes', label: 'Transmissões', Icon: SplitIcon, count: streams.length },
+            { id: 'usuarios', label: 'Usuários', Icon: UsersIcon, count: totalPeople },
+          ].map(({ id, label, Icon, count }) => (
+            <button
+              key={id}
+              className={`mobile-nav-btn ${mobileTab === id ? 'active' : ''}`}
+              onClick={() => setMobileTab(id)}
+            >
+              <span className="mobile-nav-icon">
+                <Icon size={19} />
+                {count > 0 && <span className="mobile-nav-badge">{count}</span>}
+              </span>
+              <span className="mobile-nav-label">{label}</span>
+            </button>
+          ))}
+        </nav>
       </section>
     </main>
   );
