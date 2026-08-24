@@ -667,6 +667,16 @@ function App() {
     picker.onPickSource((sources) => setPickerSources(sources));
   }, []);
 
+  // Lets the Android screen-share notification's "Sair da chamada" action
+  // reach the app even when it's not the one that started the share (the
+  // notification survives as long as capture is running, independent of
+  // which JS closure originally set things up).
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.greenlabsMobile) return undefined;
+    window.__glLeaveCall = () => disconnect();
+    return () => { delete window.__glLeaveCall; };
+  }, []);
+
   useEffect(() => {
     try { localStorage.setItem('greenlabs:userName', name); } catch {}
   }, [name]);
@@ -1058,17 +1068,45 @@ function App() {
     const canvasStream = canvas.captureStream(fps);
     const videoTrack = canvasStream.getVideoTracks()[0];
 
-    const resp = await fetch(`http://127.0.0.1:${port}/stream`);
-    if (!resp.ok || !resp.body) throw new Error('stream de tela indisponível');
+    // The native server socket is bound before onReady fires, but connecting
+    // right as the service/foreground-notification machinery is still
+    // settling has been flaky in practice - a couple of quick retries costs
+    // nothing and covers that without masking a real failure.
+    let resp;
+    let lastErr;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        resp = await fetch(`http://127.0.0.1:${port}/stream`);
+        if (resp.ok && resp.body) { lastErr = null; break; }
+        lastErr = new Error(`stream respondeu ${resp.status}`);
+      } catch (err) {
+        lastErr = err;
+      }
+      await new Promise((r) => setTimeout(r, 150 * (attempt + 1)));
+    }
+    if (lastErr) throw lastErr;
+
     const reader = resp.body.getReader();
     let buffer = new Uint8Array(0);
     let stopped = false;
+    let lastDrawAt = 0;
+    const minDrawIntervalMs = 1000 / fps;
+
+    const teardownOnError = (err) => {
+      if (stopped) return;
+      stopped = true;
+      console.warn('Android screen stream dropped:', err);
+      setShareError('A transmissão de tela caiu no meio do caminho.');
+      try { reader.cancel(); } catch {}
+      try { videoTrack.stop(); } catch {}
+      bridge.stopScreenCapture?.();
+    };
 
     (async () => {
       try {
         while (!stopped) {
           const { value, done } = await reader.read();
-          if (done) break;
+          if (done) { teardownOnError(new Error('stream encerrado pelo lado nativo')); break; }
           const merged = new Uint8Array(buffer.length + value.length);
           merged.set(buffer, 0);
           merged.set(value, buffer.length);
@@ -1079,6 +1117,15 @@ function App() {
             if (buffer.length < 4 + len) break;
             const jpegBytes = buffer.slice(4, 4 + len);
             buffer = buffer.slice(4 + len);
+            // Frames can arrive in bursts (network/scheduling jitter) - drawing
+            // every one the instant it decodes makes the canvas sit still for a
+            // stretch and then jump, which reads as the picture "teleporting".
+            // Pacing draws to the target interval and dropping the rest between
+            // them keeps captureStream() sampling something closer to a steady
+            // cadence instead of a stale frame followed by a jump.
+            const now = performance.now();
+            if (now - lastDrawAt < minDrawIntervalMs) continue;
+            lastDrawAt = now;
             try {
               const bitmap = await createImageBitmap(new Blob([jpegBytes], { type: 'image/jpeg' }));
               ctx2d.drawImage(bitmap, 0, 0, width, height);
@@ -1086,18 +1133,22 @@ function App() {
             } catch {}
           }
         }
-      } catch {}
+      } catch (err) {
+        teardownOnError(err);
+      }
     })();
 
     window.__glScreenStopped = () => {
       try { videoTrack.stop(); } catch {}
     };
     videoTrack.addEventListener('ended', () => {
+      if (stopped) return;
       stopped = true;
       try { reader.cancel(); } catch {}
       bridge.stopScreenCapture?.();
     });
 
+    if (stopped) throw new Error('a captura caiu antes de começar a transmitir');
     const count = localStreamsRef.current.filter((i) => i.kind === 'screen').length + 1;
     await addLocalStream('screen', `Tela ${count} - ${quality.label}`, canvasStream, { ...quality, width, height, fps });
     setShowLiveBanner(true);

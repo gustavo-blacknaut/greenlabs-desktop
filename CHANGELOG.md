@@ -3,6 +3,33 @@
 Todas as mudanças notáveis do app desktop, por versão. Formato livre, em
 português, ligado aos [releases do GitHub](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases).
 
+## [0.2.2](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.2.2) — 2026-08-24
+
+- **Delay do áudio da tela reduzido.** Com o áudio realmente chegando no
+  remoto (fix da 0.2.1), o delay residual ficou perceptível — o buffer do
+  `AudioWorklet` no navegador foi de 200ms/100ms de margem para 120ms/40ms.
+- **Compartilhar tela "teleportando" no Android.** Os frames JPEG chegavam
+  em rajadas e eram desenhados assim que decodificados; se várias chegassem
+  juntas e depois nada por um tempo, dava a impressão de salto em vez de
+  movimento contínuo. Agora o desenho no canvas é espaçado pelo intervalo
+  do fps alvo, descartando o excesso entre um desenho e outro.
+- **"Failed to fetch" ao tentar compartilhar tela.** Adicionado retry com
+  backoff na conexão inicial ao stream nativo.
+- **Transmissão caía e o app continuava dizendo que estava transmitindo.**
+  Se a conexão com o stream de tela morresse no meio (rede, serviço
+  encerrado), o erro era engolido silenciosamente e a UI nunca era
+  avisada. Agora qualquer queda encerra a faixa de vídeo de verdade — o
+  que já limpa o card na tela sozinho — e mostra um aviso.
+- **Insets do Android não aplicavam no primeiro carregamento.** O listener
+  de `WindowInsets` era registrado depois de `setContentView()`, perdendo o
+  único despacho automático que acontece nesse momento — o padding do topo
+  só aparecia depois de algum evento novo (rotação, teclado). Corrigido
+  forçando um novo despacho (`requestApplyInsets`) logo após registrar o
+  listener.
+- **Notificação do compartilhamento de tela ganhou botões**: "Parar
+  transmissão" e "Sair da chamada", direto da notificação, sem precisar
+  voltar pro app.
+
 ## [0.2.1](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.2.1) — 2026-08-24
 
 Dois bugs que só ficaram visíveis depois que o áudio da tela voltou a
