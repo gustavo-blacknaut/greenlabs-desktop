@@ -22,11 +22,8 @@ servidor só serve para as pessoas se encontrarem.
   - [Pelo aplicativo (mais simples)](#pelo-aplicativo-mais-simples)
   - [Pelo terminal](#pelo-terminal)
   - [Sobre a porta](#sobre-a-porta)
-  - [1. Mesma rede (LAN)](#1-mesma-rede-lan)
-  - [2. Radmin VPN / Hamachi](#2-radmin-vpn--hamachi)
-  - [3. Túnel público (Cloudflare / ngrok)](#3-túnel-público-cloudflare--ngrok)
+  - [Guia completo de hospedagem](#guia-completo-de-hospedagem)
   - [Atualizando um servidor que já estava rodando](#atualizando-um-servidor-que-já-estava-rodando)
-  - [4. VPS](#4-vps)
 - [Por que um servidor no Brasil importa](#por-que-um-servidor-no-brasil-importa)
 - [Requisitos mínimos](#requisitos-mínimos)
 - [Desenvolvimento](#desenvolvimento)
@@ -175,13 +172,8 @@ Clicar em **Parar servidor** encerra tudo e libera a porta.
 Para hospedar sem abrir a interface — em uma VPS, por exemplo:
 
 ```bash
-npm run host
-```
-
-Ele sobe o servidor e lista os endereços que você pode compartilhar:
-
-```bash
-npm run host
+npm run host              # só rede local / Radmin VPN
+npm run host:tunnel       # + túnel público (cloudflared ou ngrok)
 ```
 
 Ele sobe o servidor e lista os endereços que você pode compartilhar:
@@ -214,79 +206,25 @@ PORT=30000 node server/signaling.js
 Quem entra precisa usar a mesma porta no endereço (`ws://SEU_IP:30000`). Ao usar
 túnel, a porta não aparece no endereço público — o cloudflared/ngrok cuida disso.
 
-### 1. Mesma rede (LAN)
+### Guia completo de hospedagem
 
-O caso mais simples: todos na mesma casa, no mesmo Wi-Fi ou cabo.
+Para hospedar em VPS, Linux, Windows como serviço, Pterodactyl ou Docker, sem
+precisar baixar o app de desktop inteiro, existe um repositório dedicado só
+para o servidor:
 
-```bash
-npm run host
-```
+**→ [github.com/gustavo-blacknaut/greenlabs-live-streaming-server](https://github.com/gustavo-blacknaut/greenlabs-live-streaming-server)**
 
-Compartilhe o endereço da interface Wi-Fi/Ethernet (ex: `ws://192.168.18.6:25640`).
-Não precisa configurar mais nada.
+Lá tem o passo a passo completo de cada método:
 
-> Se o Windows perguntar sobre o firewall na primeira execução, permita o acesso
-> em **redes privadas**.
-
-### 2. Radmin VPN / Hamachi
-
-Melhor opção para jogar com amigos pela internet **sem abrir portas no roteador**
-e sem depender de serviço externo.
-
-1. Instale o [Radmin VPN](https://www.radmin-vpn.com/) (gratuito) e crie uma rede.
-2. Seus amigos entram na mesma rede.
-3. Rode `npm run host`.
-4. Compartilhe o endereço marcado como `VPN` (começa com `26.`).
-
-O `npm run host` já separa e destaca esses endereços justamente porque é o
-caminho mais usado aqui.
-
-### 3. Túnel público (Cloudflare / ngrok)
-
-Para quem vai entrar sem VPN e sem estar na sua rede. O túnel expõe seu servidor
-na internet com um endereço temporário.
-
-```bash
-npm run host:tunnel
-```
-
-O script detecta automaticamente o que estiver instalado e imprime o endereço:
-
-```
-  Tunnel ativo. Compartilhe este endereco:
-    wss://algo-aleatorio.trycloudflare.com
-```
-
-**Instalando o cloudflared** (recomendado — gratuito, sem cadastro, sem limite
-de banda):
-
-```bash
-winget install --id Cloudflare.cloudflared
-```
-
-**Ou o ngrok** (precisa de conta gratuita):
-
-```bash
-winget install --id Ngrok.Ngrok
-ngrok config add-authtoken SEU_TOKEN
-```
-
-Forçando um provedor específico:
-
-```bash
-npm run host -- --tunnel=cloudflared
-npm run host -- --tunnel=ngrok
-```
-
-| | cloudflared | ngrok (grátis) |
+| Método | Alcance | Precisa de conta/porta aberta? |
 |---|---|---|
-| Cadastro | não precisa | precisa |
-| Endereço fixo | não (muda a cada execução) | não |
-| Limite de banda | sem limite prático | limitado |
-| Latência extra | ~10–30 ms | ~20–60 ms |
-
-> O túnel adiciona um salto na rota, então a latência sobe um pouco. Se todos
-> puderem usar Radmin VPN, ela tende a ficar melhor.
+| Mesma rede (LAN) | só quem está na mesma Wi-Fi/cabo | não |
+| Radmin VPN / Hamachi | qualquer lugar, rede virtual | não |
+| Túnel (cloudflared/ngrok) | qualquer lugar, internet pública | cloudflared não, ngrok sim |
+| VPS (systemd/pm2) | qualquer lugar, endereço fixo | porta no firewall |
+| Windows como serviço (NSSM/pm2) | conforme o método acima | conforme o método acima |
+| Pterodactyl | qualquer lugar, painel cuida da porta | depende do painel |
+| Docker | qualquer lugar | porta exposta no container |
 
 ### Atualizando um servidor que já estava rodando
 
@@ -321,56 +259,7 @@ Compatibilidade entre versões:
 Ou seja, dá para atualizar servidor e clientes em qualquer ordem — nada quebra,
 só o ping dos participantes fica impreciso até os dois lados estarem atualizados.
 
-### 4. VPS
-
-Para um servidor sempre online, com endereço fixo. Em uma VPS Linux:
-
-```bash
-git clone https://github.com/gustavo-blacknaut/greenlabs-live-streaming.git
-cd greenlabs-live-streaming
-npm install --omit=dev
-PORT=25640 node server/signaling.js
-```
-
-Mantendo no ar com systemd (`/etc/systemd/system/greenlabs.service`):
-
-```ini
-[Unit]
-Description=GreenLabs Signaling
-After=network.target
-
-[Service]
-Type=simple
-User=greenlabs
-WorkingDirectory=/opt/greenlabs-live-streaming
-Environment=PORT=25640
-ExecStart=/usr/bin/node server/signaling.js
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-```
-
-```bash
-sudo systemctl enable --now greenlabs
-```
-
-Libere a porta no firewall:
-
-```bash
-sudo ufw allow 25640/tcp
-```
-
-Para usar `wss://` (recomendado se for público), coloque um Nginx ou Caddy na
-frente com certificado. Exemplo com Caddy (`Caddyfile`):
-
-```
-call.seudominio.com {
-    reverse_proxy localhost:25640
-}
-```
-
-Verificando se está no ar:
+Verificando se um servidor está no ar (funciona com qualquer método acima):
 
 ```
 http://SEU_IP:25640/rooms    lista as salas e participantes
@@ -553,6 +442,11 @@ A captura de áudio por processo tomou como referência o
 [exemplo oficial de Application Loopback](https://github.com/microsoft/Windows-classic-samples/tree/main/Samples/ApplicationLoopback)
 da Microsoft — em especial o formato IEEE float exigido pelo cliente de process
 loopback e a necessidade de um completion handler *agile*.
+
+### Projetos relacionados
+
+- [greenlabs-live-streaming-server](https://github.com/gustavo-blacknaut/greenlabs-live-streaming-server) — só o servidor, para hospedar sem baixar o app inteiro
+- [greenlabs-live-streaming-mobile](https://github.com/gustavo-blacknaut/greenlabs-live-streaming-mobile) — cliente Android
 
 ### Stack
 
