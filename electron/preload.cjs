@@ -32,5 +32,6 @@ contextBridge.exposeInMainWorld('greenlabsApp', {
   startHost: (opts) => ipcRenderer.invoke('greenlabs:host-start', opts),
   stopHost: () => ipcRenderer.invoke('greenlabs:host-stop'),
   getHostState: () => ipcRenderer.invoke('greenlabs:host-state'),
+  getTunnelProviders: () => ipcRenderer.invoke('greenlabs:host-providers'),
   onHostState: (cb) => ipcRenderer.on('greenlabs:host-state', (_e, state) => cb(state)),
 });

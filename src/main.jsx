@@ -579,6 +579,7 @@ function App() {
     try { return localStorage.getItem('greenlabs:hostTunnel') === '1'; } catch { return false; }
   });
   const [hostBusy, setHostBusy] = useState(false);
+  const [tunnelProviders, setTunnelProviders] = useState(null);
   const [copied, setCopied] = useState('');
   const [gridSlots, setGridSlots] = useState(() => {
     try { return Number(localStorage.getItem('greenlabs:gridSlots')) || 1; } catch { return 1; }
@@ -724,6 +725,11 @@ function App() {
     api.getHostState().then(setHostState).catch(() => {});
     api.onHostState?.(setHostState);
   }, []);
+
+  useEffect(() => {
+    if (configTab !== 'host') return;
+    window.greenlabsApp?.getTunnelProviders?.().then(setTunnelProviders).catch(() => {});
+  }, [configTab]);
   useEffect(() => { try { localStorage.setItem('greenlabs:shareAudio', shareAudioEnabled ? '1' : '0'); } catch {} }, [shareAudioEnabled]);
   useEffect(() => { try { localStorage.setItem('greenlabs:audioFilterMode', audioFilterMode); } catch {} }, [audioFilterMode]);
   useEffect(() => { try { localStorage.setItem('greenlabs:excludedAudioApps', excludedAudioApps); } catch {} }, [excludedAudioApps]);
@@ -1488,10 +1494,66 @@ function App() {
                     </label>
                   </div>
 
-                  <p className="hint">
-                    Sem túnel funciona na mesma rede ou por Radmin VPN. Com túnel, o endereço
-                    fica acessível pela internet (precisa de cloudflared ou ngrok instalado).
-                  </p>
+                  <div className="tunnel-box">
+                    <div className="tunnel-box-head">
+                      <div className="tunnel-box-title">
+                        <RadioIcon size={14} />
+                        <strong>Túnel para a internet</strong>
+                      </div>
+                      {tunnelProviders === null ? (
+                        <span className="tunnel-chip">verificando...</span>
+                      ) : tunnelProviders && (tunnelProviders.cloudflared || tunnelProviders.ngrok) ? (
+                        <span className="tunnel-chip ok">
+                          {tunnelProviders.cloudflared ? 'cloudflared' : 'ngrok'} pronto
+                        </span>
+                      ) : (
+                        <span className="tunnel-chip off">não instalado</span>
+                      )}
+                    </div>
+
+                    <p className="tunnel-explain">
+                      Sem túnel, só quem está na mesma rede (ou na mesma rede Radmin VPN)
+                      consegue entrar. O túnel cria um endereço público temporário que
+                      funciona de qualquer lugar, sem abrir porta no roteador.
+                    </p>
+
+                    {tunnelProviders && !(tunnelProviders && (tunnelProviders.cloudflared || tunnelProviders.ngrok)) && (
+                      <div className="tunnel-install">
+                        <span className="tunnel-install-label">Instale um deles e reabra esta aba:</span>
+                        <div className="tunnel-cmd">
+                          <code>winget install --id Cloudflare.cloudflared</code>
+                          <button className="icon-btn sm" title="Copiar" onClick={() => copyAddress('winget install --id Cloudflare.cloudflared')}>
+                            {copied === 'winget install --id Cloudflare.cloudflared' ? <CheckIcon size={14} /> : <PlusIcon size={14} />}
+                          </button>
+                        </div>
+                        <div className="tunnel-cmd">
+                          <code>winget install --id Ngrok.Ngrok</code>
+                          <button className="icon-btn sm" title="Copiar" onClick={() => copyAddress('winget install --id Ngrok.Ngrok')}>
+                            {copied === 'winget install --id Ngrok.Ngrok' ? <CheckIcon size={14} /> : <PlusIcon size={14} />}
+                          </button>
+                        </div>
+                        <span className="tunnel-note">
+                          O cloudflared não precisa de conta. O ngrok exige cadastro e um
+                          <code>ngrok config add-authtoken SEU_TOKEN</code> antes do primeiro uso.
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="tunnel-flow">
+                      <div className="tunnel-flow-row">
+                        <span className="tunnel-flow-tag">sem túnel</span>
+                        <code>ws://SEU_IP_LOCAL:{hostPort || 25640}</code>
+                      </div>
+                      <div className="tunnel-flow-row">
+                        <span className="tunnel-flow-tag accent">com túnel</span>
+                        <code>wss://algo-aleatorio.trycloudflare.com</code>
+                      </div>
+                    </div>
+                    <span className="tunnel-note">
+                      Com túnel o endereço não leva porta — ela fica escondida do lado do
+                      provedor. O endereço muda a cada vez que você inicia o servidor.
+                    </span>
+                  </div>
 
                   <button
                     className={`full-btn ${hostState?.running ? 'ghost' : 'primary'}`}

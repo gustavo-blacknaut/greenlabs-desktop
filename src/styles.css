@@ -1945,3 +1945,151 @@ h2 {
   background: rgba(255, 255, 255, 0.035);
   cursor: pointer;
 }
+
+/* --- Tunnel explainer --- */
+.tunnel-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 13px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.tunnel-box-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tunnel-box-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #eaf3ee;
+}
+
+.tunnel-box-title strong {
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.tunnel-chip {
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tunnel-chip.ok {
+  border-color: var(--green-line);
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.tunnel-chip.off {
+  border-color: rgba(255, 176, 88, 0.35);
+  background: rgba(255, 176, 88, 0.12);
+  color: #ffb058;
+}
+
+.tunnel-explain {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.tunnel-install {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px;
+  border-radius: 11px;
+  ;
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.tunnel-install-label {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #e5efe9;
+}
+
+.tunnel-cmd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tunnel-cmd code {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #d8e6de;
+  font-size: 0.74rem;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.tunnel-note {
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.tunnel-note code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 0.94em;
+}
+
+.tunnel-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.tunnel-flow-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.tunnel-flow-tag {
+  flex-shrink: 0;
+  width: 74px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.tunnel-flow-tag.accent {
+  color: var(--green);
+}
+
+.tunnel-flow-row code {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+  color: #d8e6de;
+  font-size: 0.73rem;
+  overflow-x: auto;
+  white-space: nowrap;
+}

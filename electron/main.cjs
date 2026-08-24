@@ -305,6 +305,15 @@ function createWindow() {
   ipcMain.handle('greenlabs:host-stop', async () => stopHost());
   ipcMain.handle('greenlabs:host-state', () => hostState);
 
+  ipcMain.handle('greenlabs:host-providers', async () => {
+    try {
+      const { detectProviders } = await loadServerModule('tunnel.js');
+      return await detectProviders();
+    } catch {
+      return { cloudflared: false, ngrok: false };
+    }
+  });
+
   ipcMain.on('greenlabs:hide-to-tray', () => {
     if (mainWin) mainWin.hide();
   });
@@ -357,7 +366,10 @@ function pushHostState() {
 }
 
 async function loadServerModule(name) {
-  const url = require('node:url').pathToFileURL(path.join(__dirname, '..', 'server', name)).href;
+  // No app empacotado os arquivos de server/ ficam em app.asar.unpacked, e é de
+  // lá que o import() precisa carregar - ESM dentro do asar não resolve.
+  const base = path.join(__dirname, '..', 'server').replace('app.asar', 'app.asar.unpacked');
+  const url = require('node:url').pathToFileURL(path.join(base, name)).href;
   return import(url);
 }
 

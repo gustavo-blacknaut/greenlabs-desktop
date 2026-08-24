@@ -65,7 +65,11 @@
     },
     "portable": {
       "artifactName": "GreenLabs-${version}-portable.${ext}"
-    }
+    },
+    "asarUnpack": [
+      "server/**/*",
+      "electron/AudioCapture.exe"
+    ]
   },
   "dependencies": {
     "ws": "latest",
