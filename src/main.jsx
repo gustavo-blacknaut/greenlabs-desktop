@@ -571,6 +571,12 @@ function App() {
   const [obServer, setObServer] = useState('');
   const [obRoom, setObRoom] = useState('call1');
   const [cameraPicker, setCameraPicker] = useState(null); // { devices, selectedId }
+  const [shareError, setShareError] = useState('');
+  useEffect(() => {
+    if (!shareError) return;
+    const t = setTimeout(() => setShareError(''), 5000);
+    return () => clearTimeout(t);
+  }, [shareError]);
   const [hostState, setHostState] = useState(null);
   const [hostPort, setHostPort] = useState(() => {
     try { return localStorage.getItem('greenlabs:hostPort') || '25640'; } catch { return '25640'; }
@@ -1099,7 +1105,12 @@ function App() {
 
   const startScreen = async () => {
     if (window.greenlabsMobile?.requestScreenCapture) {
-      try { await startAndroidScreen(); } catch (err) { setShareError('Não foi possível compartilhar a tela.'); }
+      try {
+        await startAndroidScreen();
+      } catch (err) {
+        console.warn('Android screen capture failed:', err);
+        setShareError(`Não foi possível compartilhar a tela: ${err?.message || err}`);
+      }
       return;
     }
     const quality = getQuality(screenQualityId);
@@ -1137,8 +1148,12 @@ function App() {
             item.kind === 'screen' && item.stream.getVideoTracks()[0] === videoTrack ? { ...item, stream: finalStream } : item
           ));
 
-          for (const [, pc] of peersRef.current.entries()) {
+          for (const [peerId, pc] of peersRef.current.entries()) {
             pc.addTrack(audioTrack, finalStream);
+            // addTrack alone doesn't tell the remote side anything - without a
+            // renegotiated offer the peer's ontrack never fires and the audio
+            // just never arrives, even though it's really being sent.
+            makeOffer(peerId).catch(() => {});
           }
 
           const stopCleanup = () => cleanup();
@@ -1863,6 +1878,15 @@ function App() {
             </button>
           </div>
         </header>
+
+        {shareError && (
+          <div className="error-banner">
+            <span>{shareError}</span>
+            <button className="live-banner-close" onClick={() => setShareError('')} title="Fechar aviso">
+              <CloseIcon size={13} />
+            </button>
+          </div>
+        )}
 
         <div className={`call-grid ${streamsPanelCollapsed ? 'streams-collapsed' : ''}`}>
           <div className="stage" ref={stageRef}>

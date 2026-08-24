@@ -419,6 +419,22 @@ h2 {
   background: rgba(255, 82, 82, 0.2);
 }
 
+.error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 10px 14px 0;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 82, 82, 0.4);
+  border-radius: 10px;
+  background: linear-gradient(90deg, rgba(255, 82, 82, 0.16), rgba(255, 82, 82, 0.04));
+  color: #ff9e9e;
+  font-size: 0.8rem;
+  font-weight: 600;
+  animation: bannerFadeIn 0.25s ease-out;
+}
+
 .call-topbar {
   justify-content: space-between;
   padding: 8px 14px;
@@ -1905,6 +1921,19 @@ h2 {
 
   .side-sub-section {
     min-height: 96px;
+  }
+
+  /* The action icons (transmit tela / camera / config) end up clustered
+     tight against the connect button and ping pill on a phone-width header
+     - justify-content: space-between leaves the slack in the middle instead
+     of between them. A bit more gap keeps them from reading as glued
+     together. */
+  .actions {
+    gap: 11px;
+  }
+
+  .call-topbar.compact {
+    padding: 8px 12px;
   }
 }
 
