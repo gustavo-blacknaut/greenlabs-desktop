@@ -17,6 +17,7 @@ servidor só serve para as pessoas se encontrarem.
 - [Como funciona](#como-funciona)
 - [Instalação](#instalação)
 - [Hospedando o servidor](#hospedando-o-servidor)
+  - [Sobre a porta](#sobre-a-porta)
   - [1. Mesma rede (LAN)](#1-mesma-rede-lan)
   - [2. Radmin VPN / Hamachi](#2-radmin-vpn--hamachi)
   - [3. Túnel público (Cloudflare / ngrok)](#3-túnel-público-cloudflare--ngrok)
@@ -104,11 +105,24 @@ Ele sobe o servidor e lista os endereços que você pode compartilhar:
 Quem for entrar cola esse endereço no campo **Servidor** do GreenLabs. Pode
 digitar com ou sem `ws://` — o app normaliza sozinho.
 
-Para trocar a porta:
+### Sobre a porta
+
+A porta `25640` é só o padrão do projeto — não tem nada de especial nela.
+**Use a porta que estiver aberta na sua hospedagem.** Qualquer porta livre acima
+de 1024 serve.
 
 ```bash
 npm run host -- --port 30000
 ```
+
+Ou por variável de ambiente:
+
+```bash
+PORT=30000 node server/signaling.js
+```
+
+Quem entra precisa usar a mesma porta no endereço (`ws://SEU_IP:30000`). Ao usar
+túnel, a porta não aparece no endereço público — o cloudflared/ngrok cuida disso.
 
 ### 1. Mesma rede (LAN)
 
@@ -284,7 +298,8 @@ transmite**, não o servidor.
 | até 30 | 2 cores | 4 GB | 10 Mbps |
 
 > Esses números são só para a sinalização. Uma VPS de R$ 20/mês aguenta
-> tranquilamente 16 pessoas.
+> tranquilamente 16 pessoas. O que costuma limitar não é o servidor, e sim a
+> porta disponível na hospedagem e o upload de quem transmite.
 
 ### Máquina de quem transmite
 
