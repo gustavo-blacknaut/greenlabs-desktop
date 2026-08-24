@@ -8,3 +8,4 @@ release/
 Thumbs.db
 electron/AudioCapture.cs.bak
 electron/mute-audio-debug.log
+*.cjs.bak
