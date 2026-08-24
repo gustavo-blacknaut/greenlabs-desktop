@@ -308,9 +308,39 @@ function createWindow() {
   ipcMain.handle('greenlabs:host-providers', async () => {
     try {
       const { detectProviders } = await loadServerModule('tunnel.js');
-      return await detectProviders();
+      const found = await detectProviders();
+      found.bundled = {};
+      for (const key of Object.keys(TUNNEL_DOWNLOADS)) {
+        const local = bundledBinPath(key);
+        if (local && fs.existsSync(local)) {
+          found[key] = true;
+          found.bundled[key] = true;
+        }
+      }
+      return found;
     } catch {
       return { cloudflared: false, ngrok: false };
+    }
+  });
+
+  ipcMain.handle('greenlabs:tunnel-install', async (event, provider) => {
+    const key = provider === 'ngrok' ? 'ngrok' : 'cloudflared';
+    const entry = TUNNEL_DOWNLOADS[key];
+    const dest = bundledBinPath(key);
+    if (fs.existsSync(dest)) return { ok: true, alreadyInstalled: true, provider: key };
+    try {
+      const target = entry.zipped ? dest + '.zip' : dest;
+      await downloadTo(entry.url, target, (pct) => {
+        try { event.sender.send('greenlabs:tunnel-install-progress', { provider: key, pct }); } catch {}
+      });
+      if (entry.zipped) {
+        await extractZip(target, app.getPath('userData'));
+        try { fs.unlinkSync(target); } catch {}
+        if (!fs.existsSync(dest)) throw new Error('ngrok.exe não encontrado no zip');
+      }
+      return { ok: true, provider: key };
+    } catch (err) {
+      return { ok: false, error: err.message, provider: key };
     }
   });
 
@@ -359,6 +389,85 @@ const hostState = {
 let signalingInstance = null;
 let tunnelProc = null;
 
+// cloudflared é um único executável. Baixar sob demanda evita exigir winget ou
+// instalação manual só para abrir um túnel.
+const TUNNEL_DOWNLOADS = {
+  cloudflared: {
+    url: 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe',
+    file: 'cloudflared.exe',
+    zipped: false,
+  },
+  ngrok: {
+    url: 'https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip',
+    file: 'ngrok.exe',
+    zipped: true,
+  },
+};
+
+function bundledBinPath(provider) {
+  const entry = TUNNEL_DOWNLOADS[provider];
+  if (!entry) return null;
+  return path.join(app.getPath('userData'), entry.file);
+}
+
+function bundledCloudflaredPath() {
+  return bundledBinPath('cloudflared');
+}
+
+// O ngrok vem em zip. Extrair sem dependência: a Expand-Archive do PowerShell
+// já está em qualquer Windows suportado.
+function extractZip(zipPath, destDir) {
+  return new Promise((resolve, reject) => {
+    const args = [
+      '-NoProfile', '-Command',
+      `Expand-Archive -LiteralPath '${zipPath}' -DestinationPath '${destDir}' -Force`,
+    ];
+    const proc = require('node:child_process').spawn('powershell', args);
+    proc.on('error', reject);
+    proc.on('close', (code) => (code === 0 ? resolve() : reject(new Error('Expand-Archive saiu com ' + code))));
+  });
+}
+
+function downloadTo(url, dest, onProgress) {
+  return new Promise((resolve, reject) => {
+    const https = require('node:https');
+    const get = (target, redirects = 0) => {
+      if (redirects > 5) return reject(new Error('muitos redirecionamentos'));
+      https.get(target, { headers: { 'User-Agent': 'GreenLabs' } }, (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          res.resume();
+          return get(res.headers.location, redirects + 1);
+        }
+        if (res.statusCode !== 200) {
+          res.resume();
+          return reject(new Error('HTTP ' + res.statusCode));
+        }
+        const total = Number(res.headers['content-length'] || 0);
+        let done = 0;
+        const tmp = dest + '.part';
+        const file = fs.createWriteStream(tmp);
+        res.on('data', (chunk) => {
+          done += chunk.length;
+          if (total) onProgress?.(Math.round((done / total) * 100));
+        });
+        res.pipe(file);
+        file.on('finish', () => {
+          file.close(() => {
+            try {
+              fs.renameSync(tmp, dest);
+              resolve(dest);
+            } catch (err) {
+              reject(err);
+            }
+          });
+        });
+        file.on('error', reject);
+      }).on('error', reject);
+    };
+    get(url);
+  });
+}
+
 function pushHostState() {
   if (mainWin && !mainWin.isDestroyed()) {
     try { mainWin.webContents.send('greenlabs:host-state', hostState); } catch {}
@@ -394,15 +503,27 @@ async function startHost({ port, tunnel }) {
   pushHostState();
 
   if (tunnel) {
-    const provider = await resolveProvider('auto');
+    let provider = await resolveProvider('auto');
+    let command = null;
     if (!provider) {
-      hostState.tunnelError = 'cloudflared/ngrok nao encontrado';
+      for (const key of ['cloudflared', 'ngrok']) {
+        const local = bundledBinPath(key);
+        if (local && fs.existsSync(local)) {
+          provider = key;
+          command = local;
+          break;
+        }
+      }
+    }
+    if (!provider) {
+      hostState.tunnelError = 'cloudflared nao encontrado';
       pushHostState();
     } else {
       hostState.tunnel = provider;
       pushHostState();
       tunnelProc = startTunnel({
         provider,
+        command,
         port: chosenPort,
         onUrl: (url) => { hostState.tunnelUrl = url; pushHostState(); },
         onError: (msg) => { hostState.tunnelError = msg; pushHostState(); },

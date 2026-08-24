@@ -68,7 +68,8 @@
     },
     "asarUnpack": [
       "server/**/*",
-      "electron/AudioCapture.exe"
+      "electron/AudioCapture.exe",
+      "node_modules/ws/**/*"
     ]
   },
   "dependencies": {

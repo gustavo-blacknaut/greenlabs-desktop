@@ -38,6 +38,12 @@ export async function detectProviders() {
   return { cloudflared, ngrok };
 }
 
+// Um cloudflared baixado pelo app fica fora do PATH, então o caminho pode ser
+// informado direto em vez de depender de instalação manual.
+export function providerFromPath(binPath) {
+  return { provider: 'cloudflared', command: binPath };
+}
+
 export async function resolveProvider(requested) {
   const wanted = requested === 'cloudflare' ? 'cloudflared' : requested;
   if (wanted && wanted !== 'auto') {
@@ -51,7 +57,8 @@ export async function resolveProvider(requested) {
 
 // Both providers print the public URL to stdout/stderr, so scraping it there
 // keeps this free of extra dependencies and local API polling.
-export function startTunnel({ provider, port, onUrl, onError, onExit }) {
+export function startTunnel({ provider, port, onUrl, onError, onExit, command }) {
+  const bin = command || provider;
   const args = provider === 'cloudflared'
     ? ['tunnel', '--url', `http://localhost:${port}`]
     : ['http', String(port), '--log', 'stdout'];
@@ -62,7 +69,7 @@ export function startTunnel({ provider, port, onUrl, onError, onExit }) {
 
   let proc;
   try {
-    proc = spawn(provider, args);
+    proc = spawn(bin, args);
   } catch (err) {
     onError?.(err.message);
     return null;

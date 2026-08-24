@@ -580,6 +580,10 @@ function App() {
   });
   const [hostBusy, setHostBusy] = useState(false);
   const [tunnelProviders, setTunnelProviders] = useState(null);
+  const [tunnelInstall, setTunnelInstall] = useState(null); // null | pct | "erro"
+  const canShareScreen = typeof navigator !== 'undefined'
+    && !!navigator.mediaDevices?.getDisplayMedia;
+  const canHost = !!(typeof window !== 'undefined' && window.greenlabsApp?.startHost);
   const [copied, setCopied] = useState('');
   const [gridSlots, setGridSlots] = useState(() => {
     try { return Number(localStorage.getItem('greenlabs:gridSlots')) || 1; } catch { return 1; }
@@ -1088,6 +1092,23 @@ function App() {
     setHostBusy(false);
   };
 
+  const installTunnel = async (provider) => {
+    const api = window.greenlabsApp;
+    if (!api?.installTunnel) return;
+    setTunnelInstall({ provider, pct: 0 });
+    api.onTunnelInstallProgress?.((info) => {
+      const pct = typeof info === 'number' ? info : info?.pct;
+      setTunnelInstall({ provider, pct: pct ?? 0 });
+    });
+    const res = await api.installTunnel(provider);
+    if (res?.ok) {
+      setTunnelInstall(null);
+      api.getTunnelProviders?.().then(setTunnelProviders).catch(() => {});
+    } else {
+      setTunnelInstall({ provider, error: res?.error || 'falhou' });
+    }
+  };
+
   const copyAddress = async (value) => {
     try {
       await navigator.clipboard.writeText(value);
@@ -1389,9 +1410,11 @@ function App() {
               <button className={`tab-btn ${configTab === 'connection' ? 'active' : ''}`} onClick={() => setConfigTab('connection')}>
                 <PlugIcon size={15} /> <span>Conexão & Áudio</span>
               </button>
-              <button className={`tab-btn ${configTab === 'host' ? 'active' : ''}`} onClick={() => setConfigTab('host')}>
-                <RadioIcon size={15} /> <span>Hospedar{hostState?.running ? ' •' : ''}</span>
-              </button>
+              {canHost && (
+                <button className={`tab-btn ${configTab === 'host' ? 'active' : ''}`} onClick={() => setConfigTab('host')}>
+                  <RadioIcon size={15} /> <span>Hospedar{hostState?.running ? ' •' : ''}</span>
+                </button>
+              )}
               <button className={`tab-btn ${configTab === 'servers' ? 'active' : ''}`} onClick={() => setConfigTab('servers')}>
                 <ServerIcon size={15} /> <span>Servidores ({servers.length})</span>
               </button>
@@ -1495,66 +1518,67 @@ function App() {
                   </div>
 
                   <div className="tunnel-box">
-                    <div className="tunnel-box-head">
-                      <div className="tunnel-box-title">
+                    <div className="tunnel-row">
+                      <div className="tunnel-main">
                         <RadioIcon size={14} />
-                        <strong>Túnel para a internet</strong>
+                        <span className="tunnel-label">Túnel</span>
+                        {tunnelProviders === null ? (
+                          <span className="tunnel-chip">…</span>
+                        ) : tunnelProviders && (tunnelProviders.cloudflared || tunnelProviders.ngrok) ? (
+                          <span className="tunnel-chip ok">
+                            {tunnelProviders.cloudflared ? 'cloudflared' : 'ngrok'}
+                          </span>
+                        ) : (
+                          <span className="tunnel-chip off">indisponível</span>
+                        )}
                       </div>
-                      {tunnelProviders === null ? (
-                        <span className="tunnel-chip">verificando...</span>
-                      ) : tunnelProviders && (tunnelProviders.cloudflared || tunnelProviders.ngrok) ? (
-                        <span className="tunnel-chip ok">
-                          {tunnelProviders.cloudflared ? 'cloudflared' : 'ngrok'} pronto
-                        </span>
-                      ) : (
-                        <span className="tunnel-chip off">não instalado</span>
-                      )}
                     </div>
 
                     <p className="tunnel-explain">
-                      Sem túnel, só quem está na mesma rede (ou na mesma rede Radmin VPN)
-                      consegue entrar. O túnel cria um endereço público temporário que
-                      funciona de qualquer lugar, sem abrir porta no roteador.
+                      {tunnelProviders && (tunnelProviders.cloudflared || tunnelProviders.ngrok)
+                        ? 'Cria um endereço público temporário, acessível de qualquer rede.'
+                        : 'Sem túnel, só entra quem está na sua rede ou no mesmo Radmin VPN.'}
                     </p>
 
                     {tunnelProviders && !(tunnelProviders && (tunnelProviders.cloudflared || tunnelProviders.ngrok)) && (
-                      <div className="tunnel-install">
-                        <span className="tunnel-install-label">Instale um deles e reabra esta aba:</span>
-                        <div className="tunnel-cmd">
-                          <code>winget install --id Cloudflare.cloudflared</code>
-                          <button className="icon-btn sm" title="Copiar" onClick={() => copyAddress('winget install --id Cloudflare.cloudflared')}>
-                            {copied === 'winget install --id Cloudflare.cloudflared' ? <CheckIcon size={14} /> : <PlusIcon size={14} />}
-                          </button>
-                        </div>
-                        <div className="tunnel-cmd">
-                          <code>winget install --id Ngrok.Ngrok</code>
-                          <button className="icon-btn sm" title="Copiar" onClick={() => copyAddress('winget install --id Ngrok.Ngrok')}>
-                            {copied === 'winget install --id Ngrok.Ngrok' ? <CheckIcon size={14} /> : <PlusIcon size={14} />}
-                          </button>
-                        </div>
-                        <span className="tunnel-note">
-                          O cloudflared não precisa de conta. O ngrok exige cadastro e um
-                          <code>ngrok config add-authtoken SEU_TOKEN</code> antes do primeiro uso.
-                        </span>
+                      <div className="tunnel-providers">
+                        {[{ id: 'cloudflared', label: 'cloudflared', note: 'sem conta' },
+                          { id: 'ngrok', label: 'ngrok', note: 'precisa de token' }].map((prov) => {
+                          const busy = tunnelInstall && tunnelInstall.provider === prov.id ? tunnelInstall : null;
+                          return (
+                            <div className="tunnel-provider" key={prov.id}>
+                              <div className="tunnel-provider-text">
+                                <strong>{prov.label}</strong>
+                                <span>{prov.note}</span>
+                              </div>
+                              {busy && busy.error ? (
+                                <button className="ghost tunnel-install-btn" onClick={() => installTunnel(prov.id)}>repetir</button>
+                              ) : busy ? (
+                                <span className="tunnel-progress">{busy.pct}%</span>
+                              ) : (
+                                <button className="ghost tunnel-install-btn" onClick={() => installTunnel(prov.id)}>instalar</button>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
+                    )}
+
+                    {tunnelInstall && tunnelInstall.error && (
+                      <p className="tunnel-explain">Falhou: {tunnelInstall.error}</p>
                     )}
 
                     <div className="tunnel-flow">
                       <div className="tunnel-flow-row">
-                        <span className="tunnel-flow-tag">sem túnel</span>
-                        <code>ws://SEU_IP_LOCAL:{hostPort || 25640}</code>
+                        <span className="tunnel-flow-tag">local</span>
+                        <code>ws://SEU_IP:{hostPort || 25640}</code>
                       </div>
                       <div className="tunnel-flow-row">
-                        <span className="tunnel-flow-tag accent">com túnel</span>
-                        <code>wss://algo-aleatorio.trycloudflare.com</code>
+                        <span className="tunnel-flow-tag accent">túnel</span>
+                        <code>wss://…trycloudflare.com</code>
                       </div>
                     </div>
-                    <span className="tunnel-note">
-                      Com túnel o endereço não leva porta — ela fica escondida do lado do
-                      provedor. O endereço muda a cada vez que você inicia o servidor.
-                    </span>
                   </div>
-
                   <button
                     className={`full-btn ${hostState?.running ? 'ghost' : 'primary'}`}
                     disabled={hostBusy}
@@ -1740,9 +1764,11 @@ function App() {
               ))}
             </div>
 
-            <button className="ghost icon-btn-only sm" onClick={startScreen} title="Transmitir tela">
-              <MonitorIcon size={16} />
-            </button>
+            {canShareScreen && (
+              <button className="ghost icon-btn-only sm" onClick={startScreen} title="Transmitir tela">
+                <MonitorIcon size={16} />
+              </button>
+            )}
 
             <button className="ghost icon-btn-only sm" onClick={startCamera} title="Adicionar câmera">
               <CameraIcon size={16} />
