@@ -1885,6 +1885,27 @@ h2 {
   .modal-body {
     padding: 14px;
   }
+
+  /* Phones fall into the same 900px bucket as tablets, which puts
+     Transmissões and Usuários side by side - fine at tablet widths, but on
+     a ~375-412px phone each column has no room left. Stack them back up and
+     let the panel take a share of the actual screen height instead of the
+     fixed 260px sized for wider windows. */
+  .call-grid {
+    grid-template-rows: 1fr minmax(240px, 40vh);
+  }
+
+  .call-grid.streams-collapsed {
+    grid-template-rows: 1fr 56px;
+  }
+
+  .panel-sections-wrapper {
+    flex-direction: column;
+  }
+
+  .side-sub-section {
+    min-height: 96px;
+  }
 }
 
 /* --- Hosting tab --- */

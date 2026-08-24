@@ -966,23 +966,18 @@ function App() {
     const sampleRate = Number(resp.headers.get('X-Sample-Rate')) || 48000;
     const channels = Math.max(1, Number(resp.headers.get('X-Channels')) || 2);
 
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate });
     const dest = audioCtx.createMediaStreamDestination();
-    const bufferSize = 1024;
-    const node = audioCtx.createScriptProcessor(bufferSize, 0, channels);
-    const channelBuffers = Array.from({ length: channels }, () => []);
-    const maxSamples = Math.floor(sampleRate * 0.15); // hard cap: ~150ms of latency
-
-    node.onaudioprocess = (e) => {
-      for (let ch = 0; ch < channels; ch++) {
-        const out = e.outputBuffer.getChannelData(ch);
-        const buf = channelBuffers[ch];
-        const n = Math.min(out.length, buf.length);
-        for (let i = 0; i < n; i++) out[i] = buf[i];
-        for (let i = n; i < out.length; i++) out[i] = 0;
-        if (n > 0) buf.splice(0, n);
-      }
-    };
+    // AudioWorkletNode runs on the realtime audio thread, so main-thread jank
+    // (UI work, GC) can't turn into irregular packet timing - that was feeding
+    // WebRTC's jitter buffer bursts, making it grow the playout delay to
+    // compensate. See wasapi-audio-worklet.js for the ring buffer itself.
+    await audioCtx.audioWorklet.addModule('./wasapi-audio-worklet.js');
+    const node = new AudioWorkletNode(audioCtx, 'wasapi-audio-processor', {
+      numberOfInputs: 0,
+      numberOfOutputs: 1,
+      outputChannelCount: [channels],
+      processorOptions: { channels, sampleRate },
+    });
     node.connect(dest);
 
     const reader = resp.body.getReader();
@@ -1004,15 +999,15 @@ function App() {
           const usableFrames = Math.floor(combined.length / frameBytes);
           const usableBytes = usableFrames * frameBytes;
           const view = new DataView(combined.buffer, combined.byteOffset, usableBytes);
+          const perChannel = Array.from({ length: channels }, () => new Float32Array(usableFrames));
           for (let f = 0; f < usableFrames; f++) {
             for (let ch = 0; ch < channels; ch++) {
-              channelBuffers[ch].push(view.getFloat32((f * channels + ch) * 4, true));
+              perChannel[ch][f] = view.getFloat32((f * channels + ch) * 4, true);
             }
           }
           leftover = combined.slice(usableBytes);
-          for (let ch = 0; ch < channels; ch++) {
-            const buf = channelBuffers[ch];
-            if (buf.length > maxSamples) buf.splice(0, buf.length - maxSamples);
+          if (usableFrames > 0) {
+            node.port.postMessage(perChannel, perChannel.map((a) => a.buffer));
           }
         }
       } catch {}

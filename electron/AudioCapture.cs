@@ -225,7 +225,9 @@ namespace GreenLabsAudio {
 
             Guid ng = Guid.Empty;
             int flags = unchecked((int)0x00020000) | unchecked((int)0x00040000); // LOOPBACK | EVENTCALLBACK
-            hr = _client.Initialize(0, flags, 5 * 10000000L, 0, _pFmt, ref ng);
+            // 200ms, the size the official ApplicationLoopback sample uses. This had been
+            // 5 seconds - way oversized, and not how a real-time capture buffer should be sized.
+            hr = _client.Initialize(0, flags, 200 * 10000L, 0, _pFmt, ref ng);
             if (hr != 0) throw new Exception("Initialize hr=0x" + hr.ToString("X8"));
 
             _event = CreateEvent(IntPtr.Zero, false, false, null);
