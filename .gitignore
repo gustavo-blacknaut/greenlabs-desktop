@@ -1,0 +1,10 @@
+node_modules/
+dist/
+dist-app/
+dist-installer/
+release/
+*.log
+.DS_Store
+Thumbs.db
+electron/AudioCapture.cs.bak
+electron/mute-audio-debug.log

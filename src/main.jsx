@@ -1,0 +1,1703 @@
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import './styles.css';
+
+const ICE_SERVERS = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+];
+const makeId = () => crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+
+const QUALITIES = [
+  { id: '480p15', label: '480p 15fps - ultra leve', width: 854, height: 480, fps: 15, bitrate: 700_000 },
+  { id: '480p30', label: '480p 30fps', width: 854, height: 480, fps: 30, bitrate: 900_000 },
+  { id: '720p30', label: '720p 30fps', width: 1280, height: 720, fps: 30, bitrate: 2_200_000 },
+  { id: '720p60', label: '720p 60fps', width: 1280, height: 720, fps: 60, bitrate: 3_200_000 },
+  { id: '1080p30', label: '1080p 30fps', width: 1920, height: 1080, fps: 30, bitrate: 4_500_000 },
+  { id: '1080p60', label: '1080p 60fps', width: 1920, height: 1080, fps: 60, bitrate: 7_500_000 },
+];
+
+function getQuality(id) {
+  return QUALITIES.find((q) => q.id === id) ?? QUALITIES[4];
+}
+
+async function configureSender(sender, quality) {
+  if (!sender || sender.track?.kind !== 'video') return;
+  try {
+    const params = sender.getParameters();
+    params.degradationPreference = quality.fps >= 45 ? 'maintain-framerate' : 'maintain-resolution';
+    if (!params.encodings?.length) params.encodings = [{}];
+    params.encodings[0].maxBitrate = quality.bitrate;
+    params.encodings[0].maxFramerate = quality.fps;
+    params.encodings[0].priority = 'high';
+    params.encodings[0].networkPriority = 'high';
+    await sender.setParameters(params);
+  } catch {}
+}
+
+function processCleanAudioStream(rawStream) {
+  const audioTracks = rawStream.getAudioTracks();
+  if (!audioTracks.length) return rawStream;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = ctx.createMediaStreamSource(rawStream);
+    const filter1 = ctx.createBiquadFilter();
+    filter1.type = 'notch';
+    filter1.frequency.value = 1000;
+    filter1.Q.value = 3.0;
+
+    const filter2 = ctx.createBiquadFilter();
+    filter2.type = 'highpass';
+    filter2.frequency.value = 80;
+
+    const dest = ctx.createMediaStreamDestination();
+    source.connect(filter1);
+    filter1.connect(filter2);
+    filter2.connect(dest);
+
+    const cleanAudioTrack = dest.stream.getAudioTracks()[0];
+    return new MediaStream([
+      ...rawStream.getVideoTracks(),
+      cleanAudioTrack
+    ]);
+  } catch {
+    return rawStream;
+  }
+}
+
+function formatUserList(rawList) {
+  const nameCounts = {};
+  return rawList.map((item) => {
+    const baseName = (item.name || 'Usuario').trim();
+    nameCounts[baseName] = (nameCounts[baseName] || 0) + 1;
+    const count = nameCounts[baseName];
+    const displayName = count === 1 ? baseName : `${baseName} (${count})`;
+    return { ...item, displayName };
+  });
+}
+
+const iconProps = (size) => ({
+  width: size,
+  height: size,
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 2,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+});
+
+const GearIcon = ({ size = 18 }) => (
+  <svg {...iconProps(size)}>
+    <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+  </svg>
+);
+
+const ExpandIcon = ({ size = 18 }) => (
+  <svg {...iconProps(size)}>
+    <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+    <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
+    <path d="M3 16v3a2 2 0 0 0 2 2h3" />
+    <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+  </svg>
+);
+
+const ShrinkIcon = ({ size = 18 }) => (
+  <svg {...iconProps(size)}>
+    <path d="M9 3v3a2 2 0 0 1-2 2H4" />
+    <path d="M21 9h-3a2 2 0 0 1-2-2V4" />
+    <path d="M3 15h3a2 2 0 0 1 2 2v3" />
+    <path d="M16 21v-3a2 2 0 0 1 2-2h3" />
+  </svg>
+);
+
+const EyeIcon = ({ size = 18 }) => (
+  <svg {...iconProps(size)}>
+    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+
+const EyeOffIcon = ({ size = 18 }) => (
+  <svg {...iconProps(size)}>
+    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6.5 0 10 7 10 7a13.16 13.16 0 0 1-2.34 3.36" />
+    <path d="M6.61 6.61C3.9 8.32 2 12 2 12s3.5 7 10 7a9.13 9.13 0 0 0 4.24-1.06" />
+    <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+    <path d="M2 2l20 20" />
+  </svg>
+);
+
+const CameraIcon = ({ size = 18 }) => (
+  <svg {...iconProps(size)}>
+    <path d="M23 7l-7 5 7 5V7Z" />
+    <rect x="1" y="5" width="15" height="14" rx="2" />
+  </svg>
+);
+
+const MonitorIcon = ({ size = 18 }) => (
+  <svg {...iconProps(size)}>
+    <rect x="2" y="3" width="20" height="14" rx="2" />
+    <path d="M8 21h8" />
+    <path d="M12 17v4" />
+  </svg>
+);
+
+const PlugIcon = ({ size = 18 }) => (
+  <svg {...iconProps(size)}>
+    <path d="M12 22v-5" />
+    <path d="M9 8V2" />
+    <path d="M15 8V2" />
+    <path d="M18 8v3a6 6 0 0 1-6 6 6 6 0 0 1-6-6V8Z" />
+  </svg>
+);
+
+const LogOutIcon = ({ size = 18 }) => (
+  <svg {...iconProps(size)}>
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+    <polyline points="16 17 21 12 16 7" />
+    <line x1="21" y1="12" x2="9" y2="12" />
+  </svg>
+);
+
+const ServerIcon = ({ size = 18 }) => (
+  <svg {...iconProps(size)}>
+    <rect x="2" y="3" width="20" height="7" rx="2" />
+    <rect x="2" y="14" width="20" height="7" rx="2" />
+    <path d="M6 7h.01" />
+    <path d="M6 18h.01" />
+  </svg>
+);
+
+const UsersIcon = ({ size = 18 }) => (
+  <svg {...iconProps(size)}>
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 1-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+);
+
+const CloseIcon = ({ size = 18 }) => (
+  <svg {...iconProps(size)}>
+    <path d="M18 6 6 18" />
+    <path d="M6 6l12 12" />
+  </svg>
+);
+
+const PlusIcon = ({ size = 18 }) => (
+  <svg {...iconProps(size)}>
+    <path d="M12 5v14" />
+    <path d="M5 12h14" />
+  </svg>
+);
+
+const CheckIcon = ({ size = 16 }) => (
+  <svg {...iconProps(size)}>
+    <path d="M20 6 9 17l-5-5" />
+  </svg>
+);
+
+const StarIcon = ({ size = 16, filled = false }) => (
+  <svg {...iconProps(size)} fill={filled ? '#37ff94' : 'none'} stroke={filled ? '#37ff94' : 'currentColor'}>
+    <path d="m12 2 3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14l-5-4.87 6.91-1.01L12 2Z" />
+  </svg>
+);
+
+const RadioIcon = ({ size = 18 }) => (
+  <svg {...iconProps(size)}>
+    <circle cx="12" cy="12" r="2" />
+    <path d="M16.24 7.76a6 6 0 0 1 0 8.49" />
+    <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+  </svg>
+);
+
+const GridIcon = ({ size = 18 }) => (
+  <svg {...iconProps(size)}>
+    <rect x="3" y="3" width="7" height="7" rx="1.5" />
+    <rect x="14" y="3" width="7" height="7" rx="1.5" />
+    <rect x="3" y="14" width="7" height="7" rx="1.5" />
+    <rect x="14" y="14" width="7" height="7" rx="1.5" />
+  </svg>
+);
+
+const SingleIcon = ({ size = 18 }) => (
+  <svg {...iconProps(size)}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+  </svg>
+);
+
+const SplitIcon = ({ size = 18 }) => (
+  <svg {...iconProps(size)}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M12 4v16" />
+  </svg>
+);
+
+const WinMinIcon = () => (
+  <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+    <path d="M0 5h10" stroke="currentColor" strokeWidth="1.2" />
+  </svg>
+);
+
+const WinMaxIcon = ({ maximized = false }) => (
+  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true">
+    {maximized ? (
+      <>
+        <rect x="0.6" y="2.4" width="7" height="7" />
+        <path d="M2.4 2.4V0.6h7v7H7.6" />
+      </>
+    ) : (
+      <rect x="0.6" y="0.6" width="8.8" height="8.8" />
+    )}
+  </svg>
+);
+
+const WinCloseIcon = () => (
+  <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+    <path d="M0 0l10 10M10 0L0 10" stroke="currentColor" strokeWidth="1.2" />
+  </svg>
+);
+
+// The BrowserWindow is frameless, so the drag region and window buttons live here.
+function CameraPreview({ deviceId }) {
+  const ref = useRef(null);
+  const streamRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const stop = () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => { try { t.stop(); } catch {} });
+        streamRef.current = null;
+      }
+    };
+    stop();
+    navigator.mediaDevices
+      .getUserMedia({ video: { deviceId: deviceId ? { exact: deviceId } : undefined }, audio: false })
+      .then((stream) => {
+        if (cancelled) {
+          stream.getTracks().forEach((t) => { try { t.stop(); } catch {} });
+          return;
+        }
+        streamRef.current = stream;
+        if (ref.current) ref.current.srcObject = stream;
+      })
+      .catch(() => {});
+    return () => { cancelled = true; stop(); };
+  }, [deviceId]);
+
+  return <video ref={ref} className="camera-preview-video" autoPlay playsInline muted />;
+}
+
+function TitleBar() {
+  const api = typeof window !== 'undefined' ? window.greenlabsApp : null;
+  const [maximized, setMaximized] = useState(false);
+
+  useEffect(() => {
+    if (!api?.isMaximized) return;
+    api.isMaximized().then(setMaximized).catch(() => {});
+    api.onWindowStateChange?.(setMaximized);
+  }, []);
+
+  if (!api?.minimizeWindow) return null;
+
+  return (
+    <div className="titlebar">
+      <div className="titlebar-drag">
+        <span className="titlebar-brand">GreenLabs</span>
+      </div>
+      <div className="titlebar-controls">
+        <button className="titlebar-btn" title="Minimizar" onClick={() => api.minimizeWindow()}>
+          <WinMinIcon />
+        </button>
+        <button className="titlebar-btn" title={maximized ? 'Restaurar' : 'Maximizar'} onClick={() => api.toggleMaximizeWindow()}>
+          <WinMaxIcon maximized={maximized} />
+        </button>
+        <button className="titlebar-btn danger" title="Fechar" onClick={() => api.closeWindow()}>
+          <WinCloseIcon />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ZoomPane({ children, resetKey }) {
+  const wrapRef = useRef(null);
+  const [zoom, setZoom] = useState({ scale: 1, x: 0, y: 0 });
+  const dragRef = useRef(null);
+
+  useEffect(() => { setZoom({ scale: 1, x: 0, y: 0 }); }, [resetKey]);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const onWheel = (event) => {
+      event.preventDefault();
+      const delta = -event.deltaY * 0.0015;
+      setZoom((z) => {
+        const next = Math.min(4, Math.max(1, z.scale + delta * z.scale));
+        return next === 1 ? { scale: 1, x: 0, y: 0 } : { ...z, scale: next };
+      });
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
+  const onMouseDown = (e) => {
+    if (zoom.scale <= 1) return;
+    dragRef.current = { sx: e.clientX, sy: e.clientY, ox: zoom.x, oy: zoom.y };
+  };
+  const onMouseMove = (e) => {
+    if (!dragRef.current) return;
+    const d = dragRef.current;
+    setZoom((z) => ({ ...z, x: d.ox + (e.clientX - d.sx), y: d.oy + (e.clientY - d.sy) }));
+  };
+  const endDrag = () => { dragRef.current = null; };
+  const reset = (e) => { e.stopPropagation(); setZoom({ scale: 1, x: 0, y: 0 }); };
+
+  return (
+    <div
+      ref={wrapRef}
+      className={`zoom-pane ${zoom.scale > 1 ? 'zoomed' : ''}`}
+      onMouseDown={onMouseDown}
+      onMouseMove={onMouseMove}
+      onMouseUp={endDrag}
+      onMouseLeave={endDrag}
+      onDoubleClick={reset}
+    >
+      <div className="zoom-inner" style={{ transform: `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.scale})` }}>
+        {children}
+      </div>
+      {zoom.scale > 1 && (
+        <button className="zoom-reset" title="Redefinir zoom (duplo clique)" onClick={reset}>
+          {Math.round(zoom.scale * 100)}%
+        </button>
+      )}
+    </div>
+  );
+}
+
+function VideoPlayer({ stream, muted = false, volume = 1, className = '' }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!ref.current) return;
+    ref.current.srcObject = stream;
+  }, [stream]);
+  useEffect(() => {
+    if (!ref.current) return;
+    ref.current.volume = volume;
+    ref.current.muted = muted;
+  }, [muted, volume]);
+  return <video ref={ref} className={className} autoPlay playsInline disablePictureInPicture disableRemotePlayback />;
+}
+
+function HiddenVisual({ label = 'Prévia oculta', onReveal }) {
+  return (
+    <div className="hidden-visual">
+      <EyeOffIcon size={30} />
+      <span>{label}</span>
+      {onReveal && (
+        <button className="ghost" onClick={onReveal}>
+          <EyeIcon size={15} /> Mostrar de novo
+        </button>
+      )}
+    </div>
+  );
+}
+
+function normalizeServer(value) {
+  const clean = value.trim().replace(/\/$/, '');
+  if (!clean) return '';
+  if (clean.startsWith('ws://') || clean.startsWith('wss://')) return clean;
+  if (clean.startsWith('http://')) return `ws://${clean.slice(7)}`;
+  if (clean.startsWith('https://')) return `wss://${clean.slice(8)}`;
+  return `ws://${clean}`;
+}
+
+function cleanDomainOnly(url) {
+  return normalizeServer(url).replace(/^wss?:\/\//, '').replace(/^https?:\/\//, '');
+}
+
+function StreamCard({ item, active, collapsed, onSelect, onStop, onVolumeChange, onToggleHidden }) {
+  const owner = item.local ? 'Você' : item.ownerName;
+  const isCamera = item.kind === 'camera';
+  const qualityLabel = item.quality ? `${item.quality.width}x${item.quality.height} ${item.quality.fps}fps` : '';
+
+  const handleWheel = (event) => {
+    event.preventDefault();
+    const delta = event.deltaY < 0 ? 0.05 : -0.05;
+    const nextVol = Math.max(0, Math.min(1, Math.round((item.volume + delta) * 100) / 100));
+    onVolumeChange(item.id, nextVol);
+  };
+
+  if (collapsed) {
+    return (
+      <div className={`stream-card mini ${active ? 'active' : ''} ${item.hidden ? 'is-hidden' : ''}`} onClick={() => onSelect(item.id)} role="button" tabIndex={0} title={item.name} onKeyDown={(e) => { if (e.key === 'Enter') onSelect(item.id); }}>
+        <div className="thumb-wrap">
+          {item.hidden || active ? <HiddenVisual label={active ? 'No palco' : ''} /> : <VideoPlayer stream={item.stream} muted={true} volume={0} />}
+          <span className={`badge ${item.kind}`}>{item.kind === 'camera' ? <CameraIcon size={12} /> : <MonitorIcon size={12} />}</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`stream-card ${active ? 'active' : ''} ${item.hidden ? 'is-hidden' : ''}`} onClick={() => onSelect(item.id)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') onSelect(item.id); }}>
+      <div className="thumb-wrap">
+        {item.hidden ? (
+          <HiddenVisual label="Oculto" />
+        ) : active ? (
+          <div className="hidden-visual active-badge-visual">
+            <MonitorIcon size={24} />
+            <span>Exibindo no palco</span>
+          </div>
+        ) : (
+          <VideoPlayer stream={item.stream} muted={true} volume={0} />
+        )}
+        <span className={`badge ${item.kind}`}>
+          {item.kind === 'camera' ? <CameraIcon size={12} /> : <MonitorIcon size={12} />}
+          {item.kind === 'camera' ? 'Camera' : 'Tela'}
+        </span>
+        {item.hidden && (
+          <span className="badge-hidden" title="Oculto para você">
+            <EyeOffIcon size={13} />
+          </span>
+        )}
+      </div>
+      <div className="stream-info">
+        <div className="stream-info-text">
+          <strong>{item.name}</strong>
+          <span>{owner}{qualityLabel ? ` • ${qualityLabel}` : ''}</span>
+        </div>
+        {/* No audio on cameras, so no volume row - controls sit by the name. */}
+        {isCamera && (
+          <div className="card-actions-group">
+            <button
+              className="icon-btn sm"
+              title={item.hidden ? 'Mostrar essa prévia' : 'Ocultar essa prévia'}
+              onClick={(event) => { event.stopPropagation(); onToggleHidden(item.id); }}
+            >
+              {item.hidden ? <EyeOffIcon size={15} /> : <EyeIcon size={15} />}
+            </button>
+            {item.local && (
+              <button className="icon-btn sm stop" title="Encerrar transmissão" onClick={(event) => { event.stopPropagation(); onStop(item.id); }}>
+                <CloseIcon size={15} />
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      {!isCamera && (
+        <div className="stream-card-footer">
+          <label className="volume" onClick={(event) => event.stopPropagation()} onWheel={handleWheel} title="Gire o scroll do mouse para ajustar o volume">
+            Vol {Math.round(item.volume * 100)}%
+            <input type="range" min="0" max="1" step="0.01" value={item.volume} onChange={(event) => onVolumeChange(item.id, Number(event.target.value))} />
+          </label>
+          <div className="card-actions-group">
+            <button
+              className="icon-btn sm"
+              title={item.hidden ? 'Mostrar essa prévia' : 'Ocultar essa prévia'}
+              onClick={(event) => { event.stopPropagation(); onToggleHidden(item.id); }}
+            >
+              {item.hidden ? <EyeOffIcon size={15} /> : <EyeIcon size={15} />}
+            </button>
+            {item.local && (
+              <button className="icon-btn sm stop" title="Encerrar transmissão" onClick={(event) => { event.stopPropagation(); onStop(item.id); }}>
+                <CloseIcon size={15} />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function App() {
+  const [serverUrl, setServerUrl] = useState(() => {
+    try { return localStorage.getItem('greenlabs:defaultServer') || 'ws://localhost:25640'; } catch { return 'ws://localhost:25640'; }
+  });
+  const [roomId, setRoomId] = useState(() => {
+    try { return localStorage.getItem('greenlabs:defaultRoom') || 'call1'; } catch { return 'call1'; }
+  });
+  const [defaultServerUrl, setDefaultServerUrl] = useState(() => {
+    try { return localStorage.getItem('greenlabs:defaultServer') || 'ws://localhost:25640'; } catch { return 'ws://localhost:25640'; }
+  });
+  const [defaultRoom, setDefaultRoom] = useState(() => {
+    try { return localStorage.getItem('greenlabs:defaultRoom') || 'call1'; } catch { return 'call1'; }
+  });
+  const [servers, setServers] = useState(() => {
+    try { const raw = localStorage.getItem('greenlabs:servers'); if (raw) { const arr = JSON.parse(raw); if (Array.isArray(arr) && arr.length) return arr; } } catch {}
+    return [{ id: 'default', url: 'ws://localhost:25640', room: 'call1', label: 'Local' }];
+  });
+  const [showConfig, setShowConfig] = useState(false);
+  const [configTab, setConfigTab] = useState('connection');
+  const [newServerUrl, setNewServerUrl] = useState('');
+  const [newServerRoom, setNewServerRoom] = useState('');
+  const [newServerLabel, setNewServerLabel] = useState('');
+  const [name, setName] = useState(() => {
+    try { return localStorage.getItem('greenlabs:userName') || `Usuario ${Math.floor(Math.random() * 99) + 1}`; } catch { return `Usuario ${Math.floor(Math.random() * 99) + 1}`; }
+  });
+  const [screenQualityId, setScreenQualityId] = useState('1080p30');
+  const [hwAccel, setHwAccel] = useState(() => {
+    try { return localStorage.getItem('greenlabs:hwAccel') !== 'false'; } catch { return true; }
+  });
+  const [shareAudioEnabled, setShareAudioEnabled] = useState(() => {
+    try { return localStorage.getItem('greenlabs:shareAudio') !== '0'; } catch { return true; }
+  });
+  const [audioFilterMode, setAudioFilterMode] = useState(() => {
+    try { return localStorage.getItem('greenlabs:audioFilterMode') || 'blacklist'; } catch { return 'blacklist'; }
+  });
+  const [excludedAudioApps, setExcludedAudioApps] = useState(() => {
+    try { return localStorage.getItem('greenlabs:excludedAudioApps') || 'discord, discordptb, discordcanary, discorddevelopment, electron, greenlabs'; } catch { return 'discord, discordptb, discordcanary, discorddevelopment, electron, greenlabs'; }
+  });
+  const [runningProcesses, setRunningProcesses] = useState([]);
+  const [connected, setConnected] = useState(false);
+  const [pingMs, setPingMs] = useState(0);
+  const [roomPings, setRoomPings] = useState({});
+  const [streams, setStreams] = useState([]);
+  const [peers, setPeers] = useState([]);
+  const [activeId, setActiveId] = useState(null);
+  const [pickerSources, setPickerSources] = useState(null);
+  const [pickerTab, setPickerTab] = useState('screens');
+  const [streamsPanelCollapsed, setStreamsPanelCollapsed] = useState(false);
+  const [onboarded, setOnboarded] = useState(() => {
+    try { return localStorage.getItem('greenlabs:onboarded') === '1'; } catch { return true; }
+  });
+  const [obName, setObName] = useState('');
+  const [obServer, setObServer] = useState('');
+  const [obRoom, setObRoom] = useState('call1');
+  const [cameraPicker, setCameraPicker] = useState(null); // { devices, selectedId }
+  const [gridSlots, setGridSlots] = useState(() => {
+    try { return Number(localStorage.getItem('greenlabs:gridSlots')) || 1; } catch { return 1; }
+  });
+  const [showLiveBanner, setShowLiveBanner] = useState(true);
+
+  const stageRef = useRef(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const wsRef = useRef(null);
+  const peerIdRef = useRef(null);
+  const peersRef = useRef(new Map());
+  const localStreamsRef = useRef([]);
+  const remoteNamesRef = useRef(new Map());
+  const remoteMetaRef = useRef(new Map());
+  const pingIntervalRef = useRef(null);
+  const lastRttRef = useRef(0);
+
+  const cleanHost = useMemo(() => cleanDomainOnly(serverUrl), [serverUrl]);
+
+  const formattedParticipants = useMemo(() => {
+    const rawList = [
+      { id: 'local', name: name, isLocal: true, ping: pingMs },
+      ...peers.map((p) => ({ id: p.peerId, name: p.name, isLocal: false, ping: roomPings[p.peerId] || p.pingMs || 0 }))
+    ];
+    return formatUserList(rawList);
+  }, [name, peers, pingMs, roomPings]);
+
+  const totalPeople = formattedParticipants.length;
+
+  const activeStream = useMemo(
+    () => streams.find((item) => item.id === activeId) ?? streams.find((item) => item.kind === 'screen' && !item.hidden) ?? streams.find((item) => !item.hidden) ?? streams[0],
+    [activeId, streams]
+  );
+
+  const hasLocalScreen = useMemo(() => localStreamsRef.current.some((s) => s.kind === 'screen'), [streams]);
+
+  useEffect(() => {
+    const handleUnload = () => {
+      try {
+        wsRef.current?.close();
+        localStreamsRef.current.forEach((item) => {
+          item.stream.getTracks().forEach((track) => track.stop());
+        });
+      } catch {}
+    };
+    window.addEventListener('beforeunload', handleUnload);
+    window.addEventListener('pagehide', handleUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleUnload);
+      window.removeEventListener('pagehide', handleUnload);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleDeviceChange = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter((d) => d.kind === 'videoinput');
+        if (videoDevices.length === 0) {
+          localStreamsRef.current
+            .filter((s) => s.kind === 'camera')
+            .forEach((s) => removeLocalStream(s.id));
+        }
+      } catch {}
+    };
+    navigator.mediaDevices?.addEventListener('devicechange', handleDeviceChange);
+    return () => navigator.mediaDevices?.removeEventListener('devicechange', handleDeviceChange);
+  }, []);
+
+  useEffect(() => {
+    const picker = window.greenlabsPicker;
+    if (!picker?.onPickSource) return;
+    picker.onPickSource((sources) => setPickerSources(sources));
+  }, []);
+
+  useEffect(() => {
+    try { localStorage.setItem('greenlabs:userName', name); } catch {}
+  }, [name]);
+
+  useEffect(() => {
+    if (showConfig && window.greenlabsApp?.getRunningProcesses) {
+      window.greenlabsApp.getRunningProcesses().then((procs) => {
+        if (Array.isArray(procs)) setRunningProcesses(procs);
+      });
+    }
+  }, [showConfig]);
+
+  useEffect(() => {
+    const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    if (window.greenlabsApp?.toggleFullscreen) {
+      window.greenlabsApp.toggleFullscreen();
+      setIsFullscreen((prev) => !prev);
+      return;
+    }
+    try {
+      if (!document.fullscreenElement && stageRef.current) {
+        if (stageRef.current.requestFullscreen) {
+          await stageRef.current.requestFullscreen();
+        }
+      } else if (document.fullscreenElement) {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        }
+      }
+    } catch (e) {
+      console.error('Fullscreen error:', e);
+    }
+  };
+
+  const choosePickerSource = (id) => {
+    window.greenlabsPicker?.chooseSource(id);
+    setPickerSources(null);
+  };
+  const cancelPicker = () => {
+    window.greenlabsPicker?.cancelPick();
+    setPickerSources(null);
+  };
+
+  const pickerScreens = useMemo(() => (pickerSources ?? []).filter((s) => s.id?.startsWith('screen')), [pickerSources]);
+  const pickerWindows = useMemo(() => (pickerSources ?? []).filter((s) => !s.id?.startsWith('screen')), [pickerSources]);
+
+  useEffect(() => {
+    if (!pickerSources) return;
+    if (pickerTab === 'screens' && pickerScreens.length === 0 && pickerWindows.length) setPickerTab('windows');
+    if (pickerTab === 'windows' && pickerWindows.length === 0 && pickerScreens.length) setPickerTab('screens');
+  }, [pickerSources, pickerScreens, pickerWindows, pickerTab]);
+
+  useEffect(() => { try { localStorage.setItem('greenlabs:servers', JSON.stringify(servers)); } catch {} }, [servers]);
+  useEffect(() => { try { localStorage.setItem('greenlabs:hwAccel', String(hwAccel)); } catch {} }, [hwAccel]);
+  useEffect(() => { try { localStorage.setItem('greenlabs:gridSlots', String(gridSlots)); } catch {} }, [gridSlots]);
+  useEffect(() => { try { localStorage.setItem('greenlabs:shareAudio', shareAudioEnabled ? '1' : '0'); } catch {} }, [shareAudioEnabled]);
+  useEffect(() => { try { localStorage.setItem('greenlabs:audioFilterMode', audioFilterMode); } catch {} }, [audioFilterMode]);
+  useEffect(() => { try { localStorage.setItem('greenlabs:excludedAudioApps', excludedAudioApps); } catch {} }, [excludedAudioApps]);
+
+  const send = (payload) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(JSON.stringify(payload));
+  };
+  const syncPeers = () => setPeers([...remoteNamesRef.current.entries()].map(([peerId, peerName]) => ({ peerId, name: peerName })));
+
+  const makeOffer = async (peerId, iceRestart = false) => {
+    const pc = peersRef.current.get(peerId);
+    if (!pc) return;
+    for (const sender of pc.getSenders()) {
+      if (sender.track?.kind === 'video') {
+        const meta = localStreamsRef.current.find((s) => s.stream.getTracks().some((t) => t.id === sender.track.id));
+        if (meta?.quality) await configureSender(sender, meta.quality);
+      }
+    }
+    const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true, iceRestart });
+    await pc.setLocalDescription(offer);
+    send({ type: 'offer', to: peerId, description: pc.localDescription });
+  };
+
+  const sendStreamMeta = (peerId, item) => {
+    send({ type: 'stream-meta', to: peerId, streamId: item.stream.id, kind: item.kind, name: item.name, ownerName: item.ownerName, quality: item.quality });
+  };
+
+  const createPeer = (peerId, peerName) => {
+    if (peersRef.current.has(peerId)) return peersRef.current.get(peerId);
+    remoteNamesRef.current.set(peerId, peerName || 'Usuario');
+    syncPeers();
+    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS, bundlePolicy: 'max-bundle', rtcpMuxPolicy: 'require', iceCandidatePoolSize: 0 });
+    peersRef.current.set(peerId, pc);
+    for (const item of localStreamsRef.current) {
+      item.stream.getTracks().forEach((track) => {
+        const sender = pc.addTrack(track, item.stream);
+        if (track.kind === 'video' && item.quality) configureSender(sender, item.quality);
+      });
+    }
+    pc.onicecandidate = (event) => { if (event.candidate) send({ type: 'ice', to: peerId, candidate: event.candidate }); };
+    pc.ontrack = (event) => {
+      const stream = event.streams[0];
+      if (!stream) return;
+      const id = `${peerId}:${stream.id}`;
+      const meta = remoteMetaRef.current.get(id);
+      setStreams((current) => {
+        if (current.some((item) => item.id === id)) return current;
+        const hasVideo = stream.getVideoTracks().length > 0;
+        return [...current, { id, streamId: stream.id, kind: meta?.kind ?? (hasVideo ? 'screen' : 'camera'), name: meta?.name ?? (hasVideo ? `${remoteNamesRef.current.get(peerId)} - tela` : `${remoteNamesRef.current.get(peerId)} - camera`), ownerName: meta?.ownerName ?? remoteNamesRef.current.get(peerId) ?? 'Usuario', quality: meta?.quality ?? null, stream, volume: 1, hidden: false, local: false, peerId }];
+      });
+      setActiveId((selected) => selected ?? id);
+    };
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'failed') {
+        makeOffer(peerId, true).catch(() => {});
+      }
+    };
+    pc.oniceconnectionstatechange = () => {
+      if (pc.iceConnectionState === 'failed') {
+        pc.restartIce?.();
+        makeOffer(peerId, true);
+      }
+    };
+    return pc;
+  };
+
+  const removePeer = (peerId) => {
+    peersRef.current.get(peerId)?.close();
+    peersRef.current.delete(peerId);
+    remoteNamesRef.current.delete(peerId);
+    setStreams((current) => current.filter((item) => item.peerId !== peerId));
+    syncPeers();
+  };
+
+  const connect = () => {
+    const url = normalizeServer(serverUrl);
+    if (!url) return;
+    wsRef.current?.close();
+    if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+    const ws = new WebSocket(url);
+    wsRef.current = ws;
+    ws.onopen = () => {
+      send({ type: 'join', roomId, name });
+      pingIntervalRef.current = setInterval(() => {
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          send({ type: 'ping', timestamp: Date.now(), rtt: lastRttRef.current });
+        }
+      }, 1000);
+    };
+    ws.onmessage = async (event) => {
+      const message = JSON.parse(event.data);
+      if (message.type === 'pong') {
+        const rtt = Math.max(1, Date.now() - Number(message.timestamp || Date.now()));
+        lastRttRef.current = rtt;
+        setPingMs(rtt);
+        return;
+      }
+      if (message.type === 'room-pings') {
+        if (message.pings) setRoomPings(message.pings);
+        return;
+      }
+      if (message.type === 'joined') {
+        peerIdRef.current = message.peerId;
+        setConnected(true);
+        message.peers.forEach((peer) => createPeer(peer.peerId, peer.name));
+        for (const peer of message.peers) {
+          localStreamsRef.current.forEach((item) => sendStreamMeta(peer.peerId, item));
+          await makeOffer(peer.peerId);
+        }
+      }
+      if (message.type === 'peer-joined') {
+        createPeer(message.peerId, message.name);
+        syncPeers();
+      }
+      if (message.type === 'peer-left') {
+        removePeer(message.peerId);
+      }
+      if (message.type === 'stream-ended') {
+        setStreams((current) => {
+          const next = current.filter((item) => item.id !== message.id && item.streamId !== message.streamId && item.id !== `${message.from}:${message.streamId}`);
+          setActiveId((selected) => (selected === message.id || selected === `${message.from}:${message.streamId}` ? next[0]?.id ?? null : selected));
+          return next;
+        });
+      }
+      if (message.type === 'stream-meta') {
+        remoteMetaRef.current.set(`${message.from}:${message.streamId}`, { kind: message.kind, name: message.name, ownerName: message.ownerName, quality: message.quality });
+        setStreams((current) => current.map((item) => (item.id === `${message.from}:${message.streamId}` ? { ...item, kind: message.kind, name: message.name, ownerName: message.ownerName, quality: message.quality } : item)));
+      }
+      if (message.type === 'offer') {
+        const pc = createPeer(message.from, remoteNamesRef.current.get(message.from));
+        const isPolite = peerIdRef.current ? message.from < peerIdRef.current : true;
+        if (pc.signalingState !== 'stable' && !isPolite) {
+          return;
+        }
+        if (pc.signalingState !== 'stable' && isPolite) {
+          await pc.setRemoteDescription({ type: 'rollback' }).catch(() => {});
+        }
+        await pc.setRemoteDescription(message.description);
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        localStreamsRef.current.forEach((item) => sendStreamMeta(message.from, item));
+        send({ type: 'answer', to: message.from, description: pc.localDescription });
+      }
+      if (message.type === 'answer') {
+        const pc = peersRef.current.get(message.from);
+        if (pc && pc.signalingState !== 'stable') {
+          await pc.setRemoteDescription(message.description).catch(() => {});
+        } else if (pc) {
+          await pc.setRemoteDescription(message.description).catch(() => {});
+        }
+      }
+      if (message.type === 'ice') {
+        await peersRef.current.get(message.from)?.addIceCandidate(message.candidate).catch(() => {});
+      }
+    };
+    ws.onclose = () => {
+      if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+      setConnected(false);
+      setPingMs(0);
+      peersRef.current.forEach((pc) => pc.close());
+      peersRef.current.clear();
+      remoteNamesRef.current.clear();
+      syncPeers();
+      setStreams((current) => current.filter((item) => item.local));
+    };
+    ws.onerror = () => {};
+  };
+
+  const disconnect = () => wsRef.current?.close();
+
+  const addLocalStream = async (kind, label, stream, quality) => {
+    const item = { id: makeId(), kind, name: label, ownerName: name, stream, quality, volume: 1, hidden: false, local: true };
+    localStreamsRef.current = [...localStreamsRef.current, item];
+    stream.getTracks().forEach((track) => {
+      track.addEventListener('ended', () => removeLocalStream(item.id));
+      track.addEventListener('mute', () => removeLocalStream(item.id));
+    });
+    setStreams((current) => [...current, item]);
+    setActiveId(item.id);
+    for (const [peerId, pc] of peersRef.current.entries()) {
+      stream.getTracks().forEach((track) => {
+        const sender = pc.addTrack(track, stream);
+        if (track.kind === 'video') configureSender(sender, quality);
+      });
+      sendStreamMeta(peerId, item);
+      await makeOffer(peerId);
+    }
+  };
+
+  const removeLocalStream = async (id) => {
+    const item = localStreamsRef.current.find((s) => s.id === id);
+    if (!item) {
+      setStreams((current) => {
+        const next = current.filter((s) => s.id !== id);
+        setActiveId((selected) => (selected === id ? next.find((s) => s.kind === 'screen')?.id ?? next[0]?.id ?? null : selected));
+        return next;
+      });
+      return;
+    }
+    for (const peerId of peersRef.current.keys()) {
+      send({ type: 'stream-ended', to: peerId, id: item.id, streamId: item.stream.id });
+    }
+    try { item.stream.getTracks().forEach((track) => { try { track.stop(); } catch {} }); } catch {}
+    localStreamsRef.current = localStreamsRef.current.filter((s) => s.id !== id);
+    setStreams((current) => {
+      const next = current.filter((s) => s.id !== id);
+      setActiveId((selected) => (selected === id ? next.find((s) => s.kind === 'screen')?.id ?? next[0]?.id ?? null : selected));
+      return next;
+    });
+    for (const [peerId, pc] of peersRef.current.entries()) {
+      try {
+        pc.getSenders().forEach((sender) => {
+          if (sender.track && item.stream.getTracks().some((t) => t.id === sender.track.id || t === sender.track)) { try { pc.removeTrack(sender); } catch {} }
+        });
+      } catch {}
+      try { await makeOffer(peerId); } catch {}
+    }
+  };
+
+  // Reads the WASAPI exclusion server's raw interleaved float32 PCM stream
+  // directly (no <audio> element / WAV container - unreliable for a live
+  // float stream and adds buffering latency). This is a real per-process
+  // capture exclusion (Discord's own system playback is untouched, so you
+  // still hear it normally) - not a mute, which is why it replaces the old
+  // startExclusion/mute-audio.ps1 approach for screen-share audio.
+  const startWasapiAudioTrack = async () => {
+    const resp = await fetch(`http://127.0.0.1:25641/audio/?t=${Date.now()}`);
+    if (!resp.ok || !resp.body) throw new Error('WASAPI audio endpoint unavailable');
+
+    const sampleRate = Number(resp.headers.get('X-Sample-Rate')) || 48000;
+    const channels = Math.max(1, Number(resp.headers.get('X-Channels')) || 2);
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate });
+    const dest = audioCtx.createMediaStreamDestination();
+    const bufferSize = 1024;
+    const node = audioCtx.createScriptProcessor(bufferSize, 0, channels);
+    const channelBuffers = Array.from({ length: channels }, () => []);
+    const maxSamples = Math.floor(sampleRate * 0.15); // hard cap: ~150ms of latency
+
+    node.onaudioprocess = (e) => {
+      for (let ch = 0; ch < channels; ch++) {
+        const out = e.outputBuffer.getChannelData(ch);
+        const buf = channelBuffers[ch];
+        const n = Math.min(out.length, buf.length);
+        for (let i = 0; i < n; i++) out[i] = buf[i];
+        for (let i = n; i < out.length; i++) out[i] = 0;
+        if (n > 0) buf.splice(0, n);
+      }
+    };
+    node.connect(dest);
+
+    const reader = resp.body.getReader();
+    let leftover = new Uint8Array(0);
+    let stopped = false;
+
+    (async () => {
+      try {
+        while (!stopped) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          let combined = value;
+          if (leftover.length) {
+            combined = new Uint8Array(leftover.length + value.length);
+            combined.set(leftover, 0);
+            combined.set(value, leftover.length);
+          }
+          const frameBytes = 4 * channels;
+          const usableFrames = Math.floor(combined.length / frameBytes);
+          const usableBytes = usableFrames * frameBytes;
+          const view = new DataView(combined.buffer, combined.byteOffset, usableBytes);
+          for (let f = 0; f < usableFrames; f++) {
+            for (let ch = 0; ch < channels; ch++) {
+              channelBuffers[ch].push(view.getFloat32((f * channels + ch) * 4, true));
+            }
+          }
+          leftover = combined.slice(usableBytes);
+          for (let ch = 0; ch < channels; ch++) {
+            const buf = channelBuffers[ch];
+            if (buf.length > maxSamples) buf.splice(0, buf.length - maxSamples);
+          }
+        }
+      } catch {}
+    })();
+
+    const audioTrack = dest.stream.getAudioTracks()[0];
+    const cleanup = () => {
+      stopped = true;
+      try { reader.cancel(); } catch {}
+      try { node.disconnect(); } catch {}
+      try { audioCtx.close(); } catch {}
+    };
+    return { audioTrack, cleanup };
+  };
+
+  const startScreen = async () => {
+    const quality = getQuality(screenQualityId);
+    try {
+      const rawStream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          width: { ideal: quality.width, max: quality.width },
+          height: { ideal: quality.height, max: quality.height },
+          frameRate: { ideal: quality.fps, max: quality.fps },
+        },
+        audio: false,
+      });
+
+      const videoTrack = rawStream.getVideoTracks()[0];
+      let finalStream = new MediaStream([videoTrack]);
+      const count = localStreamsRef.current.filter((i) => i.kind === 'screen').length + 1;
+      addLocalStream('screen', `Tela ${count} - ${quality.label}`, finalStream, quality);
+      setShowLiveBanner(true);
+
+      if (!shareAudioEnabled) return;
+
+      // Attach the excluded-audio track once it's ready, without blocking
+      // video start.
+      (async () => {
+        try {
+          const { audioTrack, cleanup } = await startWasapiAudioTrack();
+          if (!audioTrack) return;
+
+          finalStream = new MediaStream([videoTrack, audioTrack]);
+
+          localStreamsRef.current = localStreamsRef.current.map((item) =>
+            item.kind === 'screen' && item.stream.getVideoTracks()[0] === videoTrack ? { ...item, stream: finalStream } : item
+          );
+          setStreams((current) => current.map((item) =>
+            item.kind === 'screen' && item.stream.getVideoTracks()[0] === videoTrack ? { ...item, stream: finalStream } : item
+          ));
+
+          for (const [, pc] of peersRef.current.entries()) {
+            pc.addTrack(audioTrack, finalStream);
+          }
+
+          const stopCleanup = () => cleanup();
+          audioTrack.addEventListener('ended', stopCleanup);
+          videoTrack.addEventListener('ended', stopCleanup);
+        } catch (err) {
+          console.warn('WASAPI audio capture failed, continuing with video-only:', err);
+        }
+      })();
+    } catch (err) {}
+  };
+
+  const startCamera = async () => {
+    try {
+      // A permission grant is needed before labels are populated.
+      const probe = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      probe.getTracks().forEach((t) => t.stop());
+    } catch (err) {
+      setShareError('Não foi possível acessar a câmera. Verifique as permissões.');
+      return;
+    }
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cams = devices.filter((d) => d.kind === 'videoinput');
+      if (!cams.length) {
+        setShareError('Nenhuma câmera encontrada.');
+        return;
+      }
+      setCameraPicker({ devices: cams, selectedId: cams[0].deviceId });
+    } catch (err) {
+      setShareError('Não foi possível listar as câmeras.');
+    }
+  };
+
+  const confirmCamera = async (deviceId) => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { deviceId: deviceId ? { exact: deviceId } : undefined, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false, // cameras never carry audio in this app
+      });
+      const count = localStreamsRef.current.filter((i) => i.kind === 'camera').length + 1;
+      addLocalStream('camera', `Câmera ${count}`, stream, getQuality('720p30'));
+      setCameraPicker(null);
+      setShareError('');
+    } catch (err) {
+      setShareError('Não foi possível iniciar a câmera selecionada.');
+    }
+  };
+
+  const toggleProcessExclusion = (procName) => {
+    const nameLower = procName.toLowerCase();
+    let currentList = excludedAudioApps.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+    if (currentList.includes(nameLower)) {
+      currentList = currentList.filter((x) => x !== nameLower);
+    } else {
+      currentList.push(nameLower);
+    }
+    const updatedStr = currentList.join(', ');
+    setExcludedAudioApps(updatedStr);
+  };
+
+  const updateVolume = (id, volume) => setStreams((current) => current.map((item) => (item.id === id ? { ...item, volume } : item)));
+  const toggleHidden = (id) => setStreams((current) => current.map((item) => (item.id === id ? { ...item, hidden: !item.hidden } : item)));
+
+  const setFavoriteServer = (targetUrl, targetRoom) => {
+    try {
+      localStorage.setItem('greenlabs:defaultServer', targetUrl);
+      localStorage.setItem('greenlabs:defaultRoom', targetRoom);
+      setDefaultServerUrl(targetUrl);
+      setDefaultRoom(targetRoom);
+      setServerUrl(targetUrl);
+      setRoomId(targetRoom);
+    } catch {}
+  };
+
+  const restoreFactory = () => {
+    try {
+      localStorage.removeItem('greenlabs:defaultServer');
+      localStorage.removeItem('greenlabs:defaultRoom');
+      setServerUrl('ws://localhost:25640');
+      setRoomId('call1');
+      setDefaultServerUrl('ws://localhost:25640');
+      setDefaultRoom('call1');
+    } catch {}
+  };
+
+  // Selected stream first so changing the slot count never reshuffles the view.
+  const gridStreams = useMemo(() => {
+    if (streams.length === 0) return [];
+    const ordered = [];
+    const pinned = streams.find((x) => x.id === activeStream?.id);
+    if (pinned) ordered.push(pinned);
+    for (const x of streams) {
+      if (ordered.length >= gridSlots) break;
+      if (pinned && x.id === pinned.id) continue;
+      ordered.push(x);
+    }
+    return ordered.slice(0, gridSlots);
+  }, [streams, activeStream, gridSlots]);
+
+  const renderTile = (item) => {
+    const own = item.local && item.kind === 'screen';
+    if (item.hidden) return <HiddenVisual label="Você ocultou essa prévia" onReveal={() => toggleHidden(item.id)} />;
+    if (own) {
+      return (
+        <div className="own-screen-preview">
+          <VideoPlayer stream={item.stream} muted={true} volume={0} className="tile-video" />
+          <div className="own-screen-overlay">
+            <MonitorIcon size={26} />
+            <strong>Sua tela está sendo transmitida</strong>
+            <span>Você não vê/ouve sua própria tela para evitar eco</span>
+          </div>
+        </div>
+      );
+    }
+    return <VideoPlayer stream={item.stream} muted={item.local} volume={item.volume} className="tile-video" />;
+  };
+
+
+  return (
+    <main className="shell single-layout">
+      <TitleBar />
+      {pickerSources && (
+        <div className="picker-overlay" onClick={cancelPicker}>
+          <div className="picker-modal wide" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <div className="modal-head-text">
+                <span className="modal-head-icon"><MonitorIcon size={19} /></span>
+                <div>
+                  <h3>Escolha o que transmitir</h3>
+                  <p>Separado entre telas inteiras e janelas de aplicativos.</p>
+                </div>
+              </div>
+              <button className="icon-btn" onClick={cancelPicker}><CloseIcon size={17} /></button>
+            </div>
+
+            <div className="tab-row">
+              <button className={`tab-btn ${pickerTab === 'screens' ? 'active' : ''}`} onClick={() => setPickerTab('screens')}>
+                <MonitorIcon size={15} /> <span>Telas ({pickerScreens.length})</span>
+              </button>
+              <button className={`tab-btn ${pickerTab === 'windows' ? 'active' : ''}`} onClick={() => setPickerTab('windows')}>
+                <CameraIcon size={15} /> <span>Aplicativos ({pickerWindows.length})</span>
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <div className="picker-grid">
+                {(pickerTab === 'screens' ? pickerScreens : pickerWindows).map((src) => (
+                  <button key={src.id} className="picker-card" onClick={() => choosePickerSource(src.id)}>
+                    <img src={src.thumbnail} alt={src.name} />
+                    <span>{src.name}</span>
+                  </button>
+                ))}
+                {(pickerTab === 'screens' ? pickerScreens : pickerWindows).length === 0 && (
+                  <div className="empty-list">Nada encontrado nessa categoria.</div>
+                )}
+              </div>
+
+              <div className="audio-option">
+                <label className="check-row" onClick={() => setShareAudioEnabled((v) => !v)}>
+                  <span className={`switch ${shareAudioEnabled ? 'on' : ''}`} />
+                  Compartilhar áudio junto com a tela
+                </label>
+                <p className="hint">
+                  {shareAudioEnabled
+                    ? 'O áudio do sistema vai junto, sem o Discord.'
+                    : 'Transmissão só de vídeo, sem nenhum áudio do seu PC.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!onboarded && (
+        <div className="onboarding">
+          <div className="onboarding-card">
+            <div className="onboarding-head">
+              <img src="./logo.png" alt="GreenLabs" className="onboarding-logo" />
+              <h2>Bem-vindo ao GreenLabs</h2>
+              <p>Configure seu nome e o servidor para começar.</p>
+            </div>
+
+            <label>Seu nome
+              <input
+                value={obName}
+                onChange={(e) => setObName(e.target.value)}
+                placeholder="Como você aparece para os outros"
+                autoFocus
+              />
+            </label>
+
+            <div className="split-fields">
+              <label>Servidor
+                <input
+                  value={obServer}
+                  onChange={(e) => setObServer(e.target.value)}
+                  placeholder="ex: 127.0.0.1:25640"
+                />
+              </label>
+              <label>Sala
+                <input value={obRoom} onChange={(e) => setObRoom(e.target.value)} placeholder="call1" />
+              </label>
+            </div>
+
+            <p className="hint">
+              Pode digitar com ou sem <code>ws://</code>
+              {obServer.trim() ? <> — vai conectar em <strong>{normalizeServer(obServer)}</strong></> : null}
+            </p>
+
+            <button
+              className="primary full-btn"
+              disabled={!obName.trim() || !obServer.trim()}
+              onClick={() => {
+                const url = normalizeServer(obServer);
+                const room = obRoom.trim() || 'call1';
+                if (!url || !obName.trim()) return;
+                setName(obName.trim());
+                setServerUrl(url);
+                setRoomId(room);
+                try {
+                  localStorage.setItem('greenlabs:userName', obName.trim());
+                  localStorage.setItem('greenlabs:defaultServer', url);
+                  localStorage.setItem('greenlabs:defaultRoom', room);
+                  localStorage.setItem('greenlabs:onboarded', '1');
+                } catch {}
+                setDefaultServerUrl(url);
+                setDefaultRoom(room);
+                setOnboarded(true);
+              }}
+            >
+              Começar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {cameraPicker && (
+        <div className="picker-overlay" onClick={() => setCameraPicker(null)}>
+          <div className="picker-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <div className="modal-head-text">
+                <span className="modal-head-icon"><CameraIcon size={19} /></span>
+                <div>
+                  <h3>Escolher câmera</h3>
+                  <p>Veja a prévia antes de transmitir.</p>
+                </div>
+              </div>
+              <button className="icon-btn" onClick={() => setCameraPicker(null)}><CloseIcon size={17} /></button>
+            </div>
+
+            <div className="modal-body camera-body">
+              <div className="camera-preview-wrap">
+                <CameraPreview deviceId={cameraPicker.selectedId} />
+              </div>
+
+              <label>Câmera
+                <select
+                  className="styled-select"
+                  value={cameraPicker.selectedId}
+                  onChange={(e) => setCameraPicker((c) => ({ ...c, selectedId: e.target.value }))}
+                >
+                  {cameraPicker.devices.map((d, i) => (
+                    <option key={d.deviceId || i} value={d.deviceId}>
+                      {d.label || `Câmera ${i + 1}`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <p className="hint">A câmera é transmitida sem áudio.</p>
+            </div>
+
+            <div className="modal-foot">
+              <button className="primary full-btn" onClick={() => confirmCamera(cameraPicker.selectedId)}>
+                <CameraIcon size={15} /> Transmitir câmera
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showConfig && (
+        <div className="picker-overlay" onClick={() => setShowConfig(false)}>
+          <div className="picker-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <div className="modal-head-text">
+                <span className="modal-head-icon"><GearIcon size={19} /></span>
+                <div>
+                  <h3>Configuração</h3>
+                  <p>Servidor: {cleanHost} • sala {roomId}</p>
+                </div>
+              </div>
+              <button className="icon-btn" onClick={() => setShowConfig(false)}><CloseIcon size={17} /></button>
+            </div>
+
+            <div className="tab-row">
+              <button className={`tab-btn ${configTab === 'connection' ? 'active' : ''}`} onClick={() => setConfigTab('connection')}>
+                <PlugIcon size={15} /> <span>Conexão & Áudio</span>
+              </button>
+              <button className={`tab-btn ${configTab === 'servers' ? 'active' : ''}`} onClick={() => setConfigTab('servers')}>
+                <ServerIcon size={15} /> <span>Servidores ({servers.length})</span>
+              </button>
+            </div>
+
+            <div className="modal-body">
+              {configTab === 'connection' && (
+                <div className="field-grid">
+                  <label>Seu Nome de Usuário<input value={name} onChange={(e) => setName(e.target.value)} placeholder="Digite seu nome..." /></label>
+                  <label>Servidor (HTTP/WS)<input value={serverUrl} onChange={(e) => setServerUrl(e.target.value)} placeholder="localhost:25640" /></label>
+                  <div className="split-fields">
+                    <label>Sala<input value={roomId} onChange={(e) => setRoomId(e.target.value)} /></label>
+                    <label>Qualidade da tela
+                      <select className="styled-select" value={screenQualityId} onChange={(e) => setScreenQualityId(e.target.value)}>
+                        {QUALITIES.map((q) => <option key={q.id} value={q.id}>{q.label}</option>)}
+                      </select>
+                    </label>
+                  </div>
+                  <hr className="divider" />
+
+                  <label>Modo de Filtro de Som da Transmissão
+                    <select className="styled-select" value={audioFilterMode} onChange={(e) => setAudioFilterMode(e.target.value)}>
+                      <option value="blacklist">Blacklist (Silenciar apenas os programas selecionados abaixo)</option>
+                      <option value="whitelist">Whitelist (Silenciar TUDO no PC, EXCETO a janela/jogo autorizada)</option>
+                    </select>
+                  </label>
+
+                  {runningProcesses.length > 0 && (
+                    <div className="process-selector-wrap">
+                      <div className="block-title"><CameraIcon size={14} /> <span>Seleção rápida de aplicativos ({runningProcesses.length} abertos)</span></div>
+                      <div className="process-chips-grid scrollable-area">
+                        {runningProcesses.map((p) => {
+                          const isExcluded = excludedAudioApps.toLowerCase().includes(p.name.toLowerCase());
+                          return (
+                            <button
+                              key={p.name}
+                              className={`process-chip ${isExcluded ? 'active-excluded' : ''}`}
+                              onClick={() => toggleProcessExclusion(p.name)}
+                              type="button"
+                            >
+                              <span className={`chip-check ${isExcluded ? 'checked' : ''}`}>{isExcluded ? <CheckIcon size={12} /> : null}</span>
+                              <span className="chip-name">{p.title || p.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <label>{audioFilterMode === 'whitelist' ? 'Transmitir APENAS o som destes programas (Whitelist)' : 'Excluir som destes programas (Blacklist)'}
+                    <input
+                      value={excludedAudioApps}
+                      onChange={(e) => setExcludedAudioApps(e.target.value)}
+                      placeholder={audioFilterMode === 'whitelist' ? 'ex: chrome, vlc, game' : 'ex: discord, spotify, chrome'}
+                    />
+                  </label>
+                  <p className="hint">
+                    {audioFilterMode === 'whitelist'
+                      ? 'Modo Whitelist: Muta 100% dos sons do Windows (incluindo chamadas do Discord), deixando sair APENAS o som dos programas listados acima!'
+                      : 'Modo Blacklist: O som dos programas listados acima não sairá na sua transmissão de tela.'}
+                  </p>
+                  <hr className="divider" />
+                  <label className="check-row" onClick={() => {
+                    const next = !hwAccel;
+                    setHwAccel(next);
+                    window.greenlabsApp?.toggleHardwareAcceleration(next);
+                  }}>
+                    <span className={`switch ${hwAccel ? 'on' : ''}`} />
+                    Aceleração por Hardware (GPU)
+                  </label>
+                  <p className="hint">Ativado = aceleração por placa de vídeo leve. Desative caso ocorram travamentos no driver de vídeo.</p>
+                  <hr className="divider" />
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button className="ghost" onClick={() => setFavoriteServer(serverUrl, roomId)}><StarIcon size={15} filled={true} /> Salvar atual como padrão</button>
+                    <button className="ghost" onClick={restoreFactory}>Restaurar fábrica</button>
+                  </div>
+                </div>
+              )}
+
+              {configTab === 'servers' && (
+                <div className="field-grid">
+                  <div className="block-title"><ServerIcon size={15} /> <span>Servidores disponíveis</span></div>
+                  <div style={{ display: 'grid', gap: '10px' }}>
+                    {servers.map((s) => {
+                      const isCurrent = cleanDomainOnly(serverUrl) === cleanDomainOnly(s.url) && roomId === s.room;
+                      const isDefault = cleanDomainOnly(defaultServerUrl) === cleanDomainOnly(s.url) && defaultRoom === s.room;
+                      return (
+                        <div key={s.id} className={`server-card-premium ${isCurrent ? 'active-server' : ''}`}>
+                          <div className="server-card-left">
+                            <div className="server-card-badge">{isCurrent ? 'CONECTADO' : isDefault ? 'PADRÃO' : 'SALVO'}</div>
+                            <strong className="server-title">{s.label || cleanDomainOnly(s.url)}</strong>
+                            <span className="server-url-sub">{cleanDomainOnly(s.url)} • sala {s.room}</span>
+                          </div>
+                          <div className="server-card-right">
+                            <button
+                              className={`ghost ${isCurrent ? 'active' : ''}`}
+                              title="Usar este servidor agora"
+                              onClick={() => { setServerUrl(s.url); setRoomId(s.room); setConfigTab('connection'); }}
+                            >
+                              <PlugIcon size={14} /> {isCurrent ? 'Em uso' : 'Conectar'}
+                            </button>
+                            <button
+                              className={`icon-btn ${isDefault ? 'accent' : ''}`}
+                              title={isDefault ? 'Servidor padrão atual' : 'Definir como servidor padrão'}
+                              onClick={() => setFavoriteServer(s.url, s.room)}
+                            >
+                              <StarIcon size={15} filled={isDefault} />
+                            </button>
+                            {servers.length > 1 && (
+                              <button className="icon-btn stop" title="Remover servidor" onClick={() => setServers((cur) => cur.filter((x) => x.id !== s.id))}>
+                                <CloseIcon size={15} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <hr className="divider" />
+                  <div className="block-title"><PlusIcon size={15} /> <span>Adicionar novo servidor</span></div>
+                  <div className="add-server-box">
+                    <div className="split-fields">
+                      <label>Endereço / IP<input placeholder="127.0.0.1:25640" value={newServerUrl} onChange={(e) => setNewServerUrl(e.target.value)} /></label>
+                      <label>Sala<input placeholder="ex: call1" value={newServerRoom} onChange={(e) => setNewServerRoom(e.target.value)} /></label>
+                    </div>
+                    <label>Nome do Servidor (Opcional)<input placeholder="ex: Servidor Principal" value={newServerLabel} onChange={(e) => setNewServerLabel(e.target.value)} /></label>
+                    <button className="primary full-btn" onClick={() => {
+                      const url = normalizeServer(newServerUrl);
+                      const room = newServerRoom.trim() || 'call1';
+                      if (!url) return;
+                      const entry = { id: makeId(), url, room, label: newServerLabel.trim() || room };
+                      setServers((cur) => [...cur, entry]);
+                      setNewServerUrl(''); setNewServerRoom(''); setNewServerLabel('');
+                    }}>
+                      <PlusIcon size={16} /> Adicionar servidor
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button className="primary" onClick={() => setShowConfig(false)}>
+                <CheckIcon size={16} /> Concluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <section className="main-panel full-width">
+        {hasLocalScreen && showLiveBanner && (
+          <div className="live-banner">
+            <div className="live-banner-left">
+              <span className="live-pulse" />
+              <RadioIcon size={16} />
+              <span>Você está transmitindo ao vivo</span>
+            </div>
+            <button className="live-banner-close" onClick={() => setShowLiveBanner(false)} title="Fechar aviso">
+              <CloseIcon size={14} />
+            </button>
+          </div>
+        )}
+
+        <header className="call-topbar compact">
+          <div className="topbar-title">
+            <div className="brand-badge-only-logo" title="GreenLabs">
+              <img src="./logo.png" alt="GreenLabs" className="brand-logo-img" />
+            </div>
+
+            <div className="compact-status">
+              <span className={`compact-dot ${connected ? 'online' : ''}`} />
+              <strong className="compact-text">
+                {connected ? `Conectado em ${roomId} (${totalPeople})` : 'Desconectado'}
+              </strong>
+            </div>
+          </div>
+
+          <div className="actions">
+            <div className="mini-ping" title="Ping em tempo real">
+              <span className={`mini-ping-dot ${connected && pingMs > 0 ? 'online' : ''}`} />
+              <span>{pingMs > 0 ? `${pingMs}ms` : '0ms'}</span>
+            </div>
+
+            {connected ? (
+              <button className="icon-btn-only connected-exit sm" onClick={disconnect} title="Sair da sala">
+                <LogOutIcon size={16} />
+              </button>
+            ) : (
+              <button className="primary icon-btn-only sm" onClick={connect} title="Entrar na sala">
+                <PlugIcon size={16} />
+              </button>
+            )}
+
+            <div className="layout-picker" role="group" aria-label="Divisão de tela">
+              {[{ n: 1, I: SingleIcon, t: '1 tela' }, { n: 2, I: SplitIcon, t: '2 telas' }, { n: 4, I: GridIcon, t: '4 telas' }].map(({ n, I, t }) => (
+                <button
+                  key={n}
+                  className={`layout-btn ${gridSlots === n ? 'active' : ''}`}
+                  title={t}
+                  onClick={() => setGridSlots(n)}
+                >
+                  <I size={15} />
+                </button>
+              ))}
+            </div>
+
+            <button className="ghost icon-btn-only sm" onClick={startScreen} title="Transmitir tela">
+              <MonitorIcon size={16} />
+            </button>
+
+            <button className="ghost icon-btn-only sm" onClick={startCamera} title="Adicionar câmera">
+              <CameraIcon size={16} />
+            </button>
+
+            <button className="icon-btn-only sm" onClick={() => { setShowConfig(true); setConfigTab('connection'); }} title="Configuração">
+              <GearIcon size={17} />
+            </button>
+          </div>
+        </header>
+
+        <div className={`call-grid ${streamsPanelCollapsed ? 'streams-collapsed' : ''}`}>
+          <div className="stage" ref={stageRef}>
+            {streamsPanelCollapsed && (
+              <button className="panel-reopen" title="Expandir painel" onClick={() => setStreamsPanelCollapsed(false)}>
+                <UsersIcon size={14} /> Painel
+              </button>
+            )}
+            {gridStreams.length > 0 ? (
+              <div className="stage-grid" data-count={gridStreams.length} data-slots={gridSlots}>
+                {gridStreams.map((item) => (
+                  <div
+                    key={item.id}
+                    className={`grid-tile ${activeStream?.id === item.id ? 'focused' : ''}`}
+                    onClick={() => setActiveId(item.id)}
+                  >
+                    <ZoomPane resetKey={item.id}>{renderTile(item)}</ZoomPane>
+                    <div className="tile-footer">
+                      <span className="tile-badge">
+                        {item.kind === 'camera' ? <CameraIcon size={11} /> : <MonitorIcon size={11} />}
+                      </span>
+                      <span className="tile-name">{item.name}{item.local ? ' · Você' : ''}</span>
+                    </div>
+                    <div className="tile-actions">
+                      <button
+                        className="icon-btn xs"
+                        title={item.hidden ? 'Mostrar' : 'Ocultar'}
+                        onClick={(e) => { e.stopPropagation(); toggleHidden(item.id); }}
+                      >
+                        {item.hidden ? <EyeOffIcon size={13} /> : <EyeIcon size={13} />}
+                      </button>
+                      <button
+                        className="icon-btn xs"
+                        title={isFullscreen ? 'Sair do fullscreen' : 'Expandir'}
+                        onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
+                      >
+                        {isFullscreen ? <ShrinkIcon size={13} /> : <ExpandIcon size={13} />}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {Array.from({ length: Math.max(0, gridSlots - gridStreams.length) }).map((_, i) => (
+                  <div className="grid-tile empty" key={'empty-' + i}>
+                    <MonitorIcon size={22} />
+                    <span>Slot livre</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="stage-empty">
+                <MonitorIcon size={34} />
+                <strong>Nenhuma transmissão ativa</strong>
+                <span>Clique em transmitir tela para começar</span>
+              </div>
+            )}
+          </div>
+
+          <aside className={`streams-panel dual-section ${streamsPanelCollapsed ? 'collapsed' : ''}`}>
+            <div className="side-header">
+              <span className="eyebrow">{streamsPanelCollapsed ? '' : 'Painel de Controle'}</span>
+              <div className="side-header-actions">
+                <button
+                  className="icon-btn collapse-toggle-btn"
+                  title={streamsPanelCollapsed ? 'Expandir painel' : 'Minimizar painel'}
+                  onClick={() => setStreamsPanelCollapsed((v) => !v)}
+                >
+                  {streamsPanelCollapsed ? <ExpandIcon size={16} /> : <ShrinkIcon size={16} />}
+                </button>
+              </div>
+            </div>
+
+            {streamsPanelCollapsed ? (
+              <div className="collapsed-pill-stack">
+                <button className="collapsed-pill-btn" onClick={() => setStreamsPanelCollapsed(false)} title={`Transmissões (${streams.length})`}>
+                  <MonitorIcon size={18} />
+                  <span className="pill-badge">{streams.length}</span>
+                </button>
+                <button className="collapsed-pill-btn" onClick={() => setStreamsPanelCollapsed(false)} title={`Usuários (${totalPeople})`}>
+                  <UsersIcon size={18} />
+                  <span className="pill-badge">{totalPeople}</span>
+                </button>
+              </div>
+            ) : (
+              <div className="panel-sections-wrapper">
+                <section className="side-sub-section">
+                  <div className="section-title-bar">
+                    <MonitorIcon size={14} />
+                    <span>Transmissões ({streams.length})</span>
+                  </div>
+                  <div className="stream-list scrollable-area">
+                    {streams.length === 0 ? (
+                      <div className="empty-list">Nenhuma transmissão ativa no momento.</div>
+                    ) : (
+                      streams.map((item) => (
+                        <StreamCard
+                          key={item.id}
+                          item={item}
+                          active={activeStream?.id === item.id}
+                          collapsed={streamsPanelCollapsed}
+                          onSelect={setActiveId}
+                          onStop={removeLocalStream}
+                          onVolumeChange={updateVolume}
+                          onToggleHidden={toggleHidden}
+                        />
+                      ))
+                    )}
+                  </div>
+                </section>
+
+                <section className="side-sub-section">
+                  <div className="section-title-bar">
+                    <UsersIcon size={14} />
+                    <span>Usuários ({totalPeople})</span>
+                  </div>
+                  <div className="user-list scrollable-area">
+                    {formattedParticipants.map((u) => (
+                      <div className="user-row-card" key={u.id}>
+                        <div className="user-avatar-circle">
+                          {u.displayName.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="user-name-label">
+                          <strong>{u.displayName}</strong>
+                          {u.isLocal && <span className="tag-you">(Você)</span>}
+                        </div>
+                        {u.ping > 0 && (
+                          <div className="user-ping-pill" title={`Ping: ${u.ping}ms`}>
+                            {u.ping}ms
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </div>
+            )}
+          </aside>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+createRoot(document.getElementById('root')).render(<App />);

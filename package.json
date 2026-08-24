@@ -1,0 +1,82 @@
+{
+  "name": "greenlabs",
+  "productName": "GreenLabs",
+  "version": "0.1.1",
+  "description": "GreenLabs Live Streaming Engine",
+  "author": "GreenLabs",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "electron": "electron .",
+    "app": "concurrently -k \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
+    "server": "node server/signaling.js",
+    "build": "vite build",
+    "build:exe": "npm run build && electron-builder --win nsis --x64",
+    "build:installer": "npm run build && electron-builder --win nsis --x64 -c.directories.output=dist-installer",
+    "build:dir": "npm run build && electron-builder --dir --win --x64",
+    "preview": "vite preview --host 0.0.0.0",
+    "host": "node server/host.js",
+    "host:tunnel": "node server/host.js --tunnel"
+  },
+  "build": {
+    "appId": "com.greenlabs.call",
+    "productName": "GreenLabs",
+    "asar": true,
+    "compression": "maximum",
+    "directories": {
+      "output": "dist-app"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "icon": "logo.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "GreenLabs-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "GreenLabs",
+      "runAfterFinish": true,
+      "artifactName": "GreenLabs-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "GreenLabs-${version}-portable.${ext}"
+    }
+  },
+  "dependencies": {
+    "ws": "latest",
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "latest",
+    "concurrently": "latest",
+    "electron": "latest",
+    "electron-builder": "latest",
+    "vite": "latest",
+    "wait-on": "latest"
+  }
+}
