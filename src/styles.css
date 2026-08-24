@@ -2165,3 +2165,47 @@ h2 {
     grid-template-columns: 1fr;
   }
 }
+
+/* --- Host: porta e toggle na mesma linha, sem caixa --- */
+.host-port-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.host-port-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.host-tunnel-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 0 11px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s ease;
+}
+
+.host-tunnel-toggle:hover:not(:disabled) {
+  color: #fff;
+}
+
+.host-tunnel-toggle.on {
+  color: var(--green);
+}
+
+.host-tunnel-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tunnel-providers {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}

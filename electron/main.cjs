@@ -304,6 +304,15 @@ function createWindow() {
 
   ipcMain.handle('greenlabs:host-stop', async () => stopHost());
   ipcMain.handle('greenlabs:host-state', () => hostState);
+  ipcMain.on('greenlabs:open-external', (_e, url) => {
+    // Só http(s): evita abrir esquemas arbitrários vindos do renderer.
+    try {
+      const parsed = new URL(String(url));
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        require('electron').shell.openExternal(parsed.href);
+      }
+    } catch {}
+  });
 
   ipcMain.handle('greenlabs:host-providers', async () => {
     try {

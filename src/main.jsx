@@ -1502,8 +1502,8 @@ function App() {
                     endereços abaixo — vídeo e áudio vão direto entre vocês.
                   </p>
 
-                  <div className="split-fields">
-                    <label>Porta
+                  <div className="host-port-row">
+                    <label className="host-port-field">Porta
                       <input
                         value={hostPort}
                         onChange={(e) => setHostPort(e.target.value.replace(/\D/g, '').slice(0, 5))}
@@ -1511,10 +1511,15 @@ function App() {
                         disabled={hostState?.running}
                       />
                     </label>
-                    <label className="check-row host-tunnel-row" onClick={() => { if (!hostState?.running) setHostTunnel((v) => !v); }}>
+                    <button
+                      type="button"
+                      className={`host-tunnel-toggle ${hostTunnel ? 'on' : ''}`}
+                      disabled={hostState?.running}
+                      onClick={() => setHostTunnel((v) => !v)}
+                    >
                       <span className={`switch ${hostTunnel ? 'on' : ''}`} />
-                      Abrir túnel
-                    </label>
+                      <span>Abrir túnel</span>
+                    </button>
                   </div>
 
                   <div className="tunnel-box">
@@ -1537,13 +1542,14 @@ function App() {
                     <p className="tunnel-explain">
                       {tunnelProviders && (tunnelProviders.cloudflared || tunnelProviders.ngrok)
                         ? 'Cria um endereço público temporário, acessível de qualquer rede.'
-                        : 'Sem túnel, só entra quem está na sua rede ou no mesmo Radmin VPN.'}
+                        : 'Sem túnel, só entra quem está na sua rede. O Radmin VPN resolve isso criando uma rede virtual, sem endereço público.'}
                     </p>
 
                     {tunnelProviders && !(tunnelProviders && (tunnelProviders.cloudflared || tunnelProviders.ngrok)) && (
                       <div className="tunnel-providers">
-                        {[{ id: 'cloudflared', label: 'cloudflared', note: 'sem conta' },
-                          { id: 'ngrok', label: 'ngrok', note: 'precisa de token' }].map((prov) => {
+                        {[{ id: 'cloudflared', label: 'cloudflared', note: 'sem conta, recomendado' },
+                          { id: 'ngrok', label: 'ngrok', note: 'precisa de token' },
+                          { id: 'radmin', label: 'Radmin VPN', note: 'rede virtual, sem túnel', external: 'https://www.radmin-vpn.com/' }].map((prov) => {
                           const busy = tunnelInstall && tunnelInstall.provider === prov.id ? tunnelInstall : null;
                           return (
                             <div className="tunnel-provider" key={prov.id}>
@@ -1551,7 +1557,12 @@ function App() {
                                 <strong>{prov.label}</strong>
                                 <span>{prov.note}</span>
                               </div>
-                              {busy && busy.error ? (
+                              {prov.external ? (
+                                <button
+                                  className="ghost tunnel-install-btn"
+                                  onClick={() => window.greenlabsApp?.openExternal?.(prov.external)}
+                                >baixar</button>
+                              ) : busy && busy.error ? (
                                 <button className="ghost tunnel-install-btn" onClick={() => installTunnel(prov.id)}>repetir</button>
                               ) : busy ? (
                                 <span className="tunnel-progress">{busy.pct}%</span>
