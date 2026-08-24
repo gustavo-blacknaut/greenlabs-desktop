@@ -3,6 +3,21 @@
 Todas as mudanças notáveis do app desktop, por versão. Formato livre, em
 português, ligado aos [releases do GitHub](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases).
 
+## [0.2.4](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.2.4) — 2026-08-24
+
+- **A barra de abas ficava por baixo dos botões do Android**, engolindo os
+  toques. A tentativa anterior aplicava padding na própria WebView, mas isso
+  não encolhe de forma confiável o que a página enxerga como `100dvh` — o
+  layout continuava correndo por baixo das barras do sistema. Agora o app
+  publica os tamanhos reais das barras como variáveis CSS e a página se
+  posiciona a partir delas. Medido: antes a barra invadia **34px** da área
+  do sistema; agora sobra folga e nada se sobrepõe.
+- **Controles movidos para o alcance do polegar.** Transmitir tela, câmera,
+  configuração e entrar/sair saíram do topo e agora ficam numa barra logo
+  acima das abas, com rótulo e alvo de toque de ~53px. O topo fica só com
+  identidade e status (ping). No desktop nada muda.
+- Alvos de toque das abas aumentados para 56px.
+
 ## [0.2.3](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.2.3) — 2026-08-24
 
 - **Áudio sumiu de novo na 0.2.2 — regressão minha, corrigida.** Ao apertar

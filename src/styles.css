@@ -13,6 +13,13 @@
   --panel-2: rgba(255, 255, 255, 0.045);
   --line: rgba(255, 255, 255, 0.08);
   --muted: #93a3b3;
+
+  /* Overwritten by the Android app with the real system bar sizes. Zero
+     everywhere else, so desktop and browser are unaffected. */
+  --android-inset-top: 0px;
+  --android-inset-bottom: 0px;
+  --android-inset-left: 0px;
+  --android-inset-right: 0px;
 }
 
 * {
@@ -67,6 +74,10 @@ svg {
   height: 100vh;
   height: 100dvh;
   width: 100vw;
+  padding-top: var(--android-inset-top);
+  padding-bottom: var(--android-inset-bottom);
+  padding-left: var(--android-inset-left);
+  padding-right: var(--android-inset-right);
   background:
     radial-gradient(circle at 18% -4%, rgba(55, 255, 148, 0.16), transparent 36rem),
     radial-gradient(circle at 104% 104%, rgba(83, 168, 255, 0.16), transparent 36rem),
@@ -1897,7 +1908,8 @@ h2 {
    Bottom nav (phones only) - hidden everywhere else
    ============================================================ */
 
-.mobile-nav {
+.mobile-nav,
+.mobile-actions {
   display: none;
 }
 
@@ -1957,14 +1969,65 @@ h2 {
     max-height: none;
   }
 
-  .mobile-nav {
+  /* The header controls are out of thumb reach on a tall phone, so they get
+     mirrored down here. The header keeps them too (hidden below) for desktop. */
+  .mobile-actions {
     display: flex;
     flex: 0 0 auto;
     gap: 6px;
     margin-top: 10px;
+  }
+
+  .mobile-action-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 52px;
+    padding: 8px 4px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--panel-2);
+    color: #dbe6ef;
+    font-size: 0.66rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  }
+
+  .mobile-action-btn:active {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .mobile-action-btn.join {
+    border-color: var(--green-line);
+    background: var(--green-soft);
+    color: var(--green);
+  }
+
+  .mobile-action-btn.danger {
+    border-color: rgba(255, 82, 82, 0.4);
+    background: rgba(255, 82, 82, 0.14);
+    color: #ff9e9e;
+  }
+
+  /* Everything interactive lives at the bottom on a phone; the header keeps
+     only identity and status. */
+  .actions .icon-btn-only,
+  .actions .ghost {
+    display: none;
+  }
+
+  .mobile-nav {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 6px;
+    margin-top: 8px;
     padding: 6px;
     border: 1px solid var(--line);
-    border-radius: 16px;
+    border-radius: 18px;
     background: var(--panel);
     backdrop-filter: blur(16px);
   }
@@ -1974,13 +2037,17 @@ h2 {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 3px;
-    padding: 9px 4px;
+    justify-content: center;
+    gap: 4px;
+    /* 56px keeps the whole pill inside a comfortable touch target - the old
+       54px row sat partly under the Android nav bar and swallowed taps. */
+    min-height: 56px;
+    padding: 8px 4px;
     border: none;
-    border-radius: 12px;
+    border-radius: 14px;
     background: transparent;
     color: var(--muted);
-    font-size: 0.66rem;
+    font-size: 0.68rem;
     font-weight: 700;
     letter-spacing: 0.01em;
     cursor: pointer;

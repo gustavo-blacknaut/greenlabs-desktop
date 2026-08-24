@@ -2080,6 +2080,39 @@ function App() {
           </aside>
         </div>
 
+        {/* Phone-only: the header controls sit at the top of a tall screen,
+            out of thumb reach. This mirrors them just above the tab bar. */}
+        <div className="mobile-actions">
+          {canShareScreen && (
+            <button className="mobile-action-btn" onClick={startScreen}>
+              <MonitorIcon size={17} />
+              <span>Tela</span>
+            </button>
+          )}
+          <button className="mobile-action-btn" onClick={startCamera}>
+            <CameraIcon size={17} />
+            <span>Câmera</span>
+          </button>
+          <button
+            className="mobile-action-btn"
+            onClick={() => { setShowConfig(true); setConfigTab('connection'); }}
+          >
+            <GearIcon size={17} />
+            <span>Config</span>
+          </button>
+          {connected ? (
+            <button className="mobile-action-btn danger" onClick={disconnect}>
+              <LogOutIcon size={17} />
+              <span>Sair</span>
+            </button>
+          ) : (
+            <button className="mobile-action-btn join" onClick={connect}>
+              <PlugIcon size={17} />
+              <span>Entrar</span>
+            </button>
+          )}
+        </div>
+
         <nav className="mobile-nav">
           {[
             { id: 'palco', label: 'Telas', Icon: MonitorIcon, count: null },
