@@ -59,6 +59,23 @@ export function startSignaling({ port = 25640, log = defaultLog } = {}) {
     }
   }
 
+  // Each client pings once a second, and each ping used to trigger a full
+  // broadcast to the room - n pings/s x n recipients, so the traffic grew with
+  // the square of the room. Measured: 30 participants pushed ~8 Mbps of nothing
+  // but ping updates. Coalescing to one broadcast per second per room makes it
+  // linear, and the numbers are the same either way since the clients only ping
+  // that often to begin with.
+  const pingDirty = new Set();
+  const pingFlush = setInterval(() => {
+    for (const roomId of pingDirty) broadcastRoomPings(roomId);
+    pingDirty.clear();
+  }, 1000);
+  if (typeof pingFlush.unref === 'function') pingFlush.unref();
+
+  function scheduleRoomPings(roomId) {
+    if (roomId) pingDirty.add(roomId);
+  }
+
   function leave(ws) {
     if (!ws.roomId || !rooms.has(ws.roomId)) return;
     const room = rooms.get(ws.roomId);
@@ -126,7 +143,7 @@ export function startSignaling({ port = 25640, log = defaultLog } = {}) {
           ws.lastPingMs = Math.max(1, Math.round(reported));
         }
         send(ws, { type: 'pong', timestamp: clientTime, serverTime: now });
-        if (ws.roomId) broadcastRoomPings(ws.roomId);
+        scheduleRoomPings(ws.roomId);
         return;
       }
 
@@ -178,6 +195,7 @@ export function startSignaling({ port = 25640, log = defaultLog } = {}) {
         close: () =>
           new Promise((done) => {
             clearInterval(heartbeatInterval);
+            clearInterval(pingFlush);
             for (const client of wss.clients) {
               try { client.terminate(); } catch {}
             }

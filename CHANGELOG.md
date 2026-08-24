@@ -3,20 +3,48 @@
 Todas as mudanças notáveis do app desktop, por versão. Formato livre, em
 português, ligado aos [releases do GitHub](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases).
 
+> **Nota sobre as versões 0.2.2 a 0.2.4:** algumas entradas descreviam
+> correções do app Android como se fossem deste repositório. O app Android tem
+> [repositório e versionamento próprios](https://github.com/gustavo-blacknaut/greenlabs-live-streaming-mobile);
+> o que mora aqui é a metade web dessas correções, já que o app embute o mesmo
+> cliente React. Corrigido a partir da 0.2.5.
+
+## [0.2.5](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.2.5) — 2026-08-24
+
+- **Tráfego de sinalização reduzido em até 23x.** Cada ping de cada
+  participante disparava um broadcast para a sala inteira — n pings por
+  segundo vezes n destinatários, ou seja, tráfego crescendo com o *quadrado*
+  do tamanho da sala. Medido: 30 participantes geravam ~8 Mbps só de
+  atualização de ping. Agora os broadcasts são agrupados em um por segundo por
+  sala — o resultado para quem usa é o mesmo, já que os clientes só pingam
+  nessa frequência.
+
+  | Participantes | Antes | Depois |
+  |---|---|---|
+  | 4 | 28 kbps | 9 kbps |
+  | 8 | 186 kbps | 30 kbps |
+  | 16 | 1454 kbps | 103 kbps |
+  | 30 | 7957 kbps | 338 kbps |
+
+- **`main.jsx` dividido em módulos.** Eram 2140 linhas num arquivo só,
+  misturando ícones, helpers, a ponte do Android e a lógica da chamada. Agora
+  são `icons.jsx`, `lib/media.js`, `lib/format.js`, `lib/wasapi-audio.js` e
+  `lib/android-screen.js` — este último isolando o código que só existe para o
+  app Android e que antes ficava enterrado no meio do cliente desktop.
+- **Requisitos mínimos corrigidos no README.** A tabela anterior pedia até
+  4 GB de RAM para 30 participantes. Era estimativa, não medição, e estava
+  errada por uma ordem de grandeza: medido, o servidor usa **56 MB** com 30
+  participantes — cerca de 7 MB acima do processo ocioso.
+- README atualizado: o app Android **transmite tela** desde a v1.0.3 (até
+  720p/15fps, via `MediaProjection` nativo), com link para o repositório.
+
 ## [0.2.4](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.2.4) — 2026-08-24
 
-- **A barra de abas ficava por baixo dos botões do Android**, engolindo os
-  toques. A tentativa anterior aplicava padding na própria WebView, mas isso
-  não encolhe de forma confiável o que a página enxerga como `100dvh` — o
-  layout continuava correndo por baixo das barras do sistema. Agora o app
-  publica os tamanhos reais das barras como variáveis CSS e a página se
-  posiciona a partir delas. Medido: antes a barra invadia **34px** da área
-  do sistema; agora sobra folga e nada se sobrepõe.
-- **Controles movidos para o alcance do polegar.** Transmitir tela, câmera,
-  configuração e entrar/sair saíram do topo e agora ficam numa barra logo
-  acima das abas, com rótulo e alvo de toque de ~53px. O topo fica só com
-  identidade e status (ping). No desktop nada muda.
-- Alvos de toque das abas aumentados para 56px.
+- Metade web do ajuste de layout para celular: barra de ações no rodapé
+  (transmitir tela, câmera, configuração, entrar/sair), alvos de toque maiores
+  e leitura das variáveis `--android-inset-*` publicadas pelo app Android, para
+  o layout não correr por baixo das barras do sistema. O layout de desktop não
+  muda.
 
 ## [0.2.3](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.2.3) — 2026-08-24
 

@@ -1,265 +1,18 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
-
-const ICE_SERVERS = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-];
-const makeId = () => crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
-
-const QUALITIES = [
-  { id: '480p15', label: '480p 15fps - ultra leve', width: 854, height: 480, fps: 15, bitrate: 700_000 },
-  { id: '480p30', label: '480p 30fps', width: 854, height: 480, fps: 30, bitrate: 900_000 },
-  { id: '720p30', label: '720p 30fps', width: 1280, height: 720, fps: 30, bitrate: 2_200_000 },
-  { id: '720p60', label: '720p 60fps', width: 1280, height: 720, fps: 60, bitrate: 3_200_000 },
-  { id: '1080p30', label: '1080p 30fps', width: 1920, height: 1080, fps: 30, bitrate: 4_500_000 },
-  { id: '1080p60', label: '1080p 60fps', width: 1920, height: 1080, fps: 60, bitrate: 7_500_000 },
-];
-
-function getQuality(id) {
-  return QUALITIES.find((q) => q.id === id) ?? QUALITIES[4];
-}
-
-async function configureSender(sender, quality) {
-  if (!sender || sender.track?.kind !== 'video') return;
-  try {
-    const params = sender.getParameters();
-    params.degradationPreference = quality.fps >= 45 ? 'maintain-framerate' : 'maintain-resolution';
-    if (!params.encodings?.length) params.encodings = [{}];
-    params.encodings[0].maxBitrate = quality.bitrate;
-    params.encodings[0].maxFramerate = quality.fps;
-    params.encodings[0].priority = 'high';
-    params.encodings[0].networkPriority = 'high';
-    await sender.setParameters(params);
-  } catch {}
-}
-
-function processCleanAudioStream(rawStream) {
-  const audioTracks = rawStream.getAudioTracks();
-  if (!audioTracks.length) return rawStream;
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const source = ctx.createMediaStreamSource(rawStream);
-    const filter1 = ctx.createBiquadFilter();
-    filter1.type = 'notch';
-    filter1.frequency.value = 1000;
-    filter1.Q.value = 3.0;
-
-    const filter2 = ctx.createBiquadFilter();
-    filter2.type = 'highpass';
-    filter2.frequency.value = 80;
-
-    const dest = ctx.createMediaStreamDestination();
-    source.connect(filter1);
-    filter1.connect(filter2);
-    filter2.connect(dest);
-
-    const cleanAudioTrack = dest.stream.getAudioTracks()[0];
-    return new MediaStream([
-      ...rawStream.getVideoTracks(),
-      cleanAudioTrack
-    ]);
-  } catch {
-    return rawStream;
-  }
-}
-
-function formatUserList(rawList) {
-  const nameCounts = {};
-  return rawList.map((item) => {
-    const baseName = (item.name || 'Usuario').trim();
-    nameCounts[baseName] = (nameCounts[baseName] || 0) + 1;
-    const count = nameCounts[baseName];
-    const displayName = count === 1 ? baseName : `${baseName} (${count})`;
-    return { ...item, displayName };
-  });
-}
-
-const iconProps = (size) => ({
-  width: size,
-  height: size,
-  viewBox: '0 0 24 24',
-  fill: 'none',
-  stroke: 'currentColor',
-  strokeWidth: 2,
-  strokeLinecap: 'round',
-  strokeLinejoin: 'round',
-});
-
-const GearIcon = ({ size = 18 }) => (
-  <svg {...iconProps(size)}>
-    <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
-    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
-  </svg>
-);
-
-const ExpandIcon = ({ size = 18 }) => (
-  <svg {...iconProps(size)}>
-    <path d="M8 3H5a2 2 0 0 0-2 2v3" />
-    <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
-    <path d="M3 16v3a2 2 0 0 0 2 2h3" />
-    <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
-  </svg>
-);
-
-const ShrinkIcon = ({ size = 18 }) => (
-  <svg {...iconProps(size)}>
-    <path d="M9 3v3a2 2 0 0 1-2 2H4" />
-    <path d="M21 9h-3a2 2 0 0 1-2-2V4" />
-    <path d="M3 15h3a2 2 0 0 1 2 2v3" />
-    <path d="M16 21v-3a2 2 0 0 1 2-2h3" />
-  </svg>
-);
-
-const EyeIcon = ({ size = 18 }) => (
-  <svg {...iconProps(size)}>
-    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
-    <circle cx="12" cy="12" r="3" />
-  </svg>
-);
-
-const EyeOffIcon = ({ size = 18 }) => (
-  <svg {...iconProps(size)}>
-    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6.5 0 10 7 10 7a13.16 13.16 0 0 1-2.34 3.36" />
-    <path d="M6.61 6.61C3.9 8.32 2 12 2 12s3.5 7 10 7a9.13 9.13 0 0 0 4.24-1.06" />
-    <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
-    <path d="M2 2l20 20" />
-  </svg>
-);
-
-const CameraIcon = ({ size = 18 }) => (
-  <svg {...iconProps(size)}>
-    <path d="M23 7l-7 5 7 5V7Z" />
-    <rect x="1" y="5" width="15" height="14" rx="2" />
-  </svg>
-);
-
-const MonitorIcon = ({ size = 18 }) => (
-  <svg {...iconProps(size)}>
-    <rect x="2" y="3" width="20" height="14" rx="2" />
-    <path d="M8 21h8" />
-    <path d="M12 17v4" />
-  </svg>
-);
-
-const PlugIcon = ({ size = 18 }) => (
-  <svg {...iconProps(size)}>
-    <path d="M12 22v-5" />
-    <path d="M9 8V2" />
-    <path d="M15 8V2" />
-    <path d="M18 8v3a6 6 0 0 1-6 6 6 6 0 0 1-6-6V8Z" />
-  </svg>
-);
-
-const LogOutIcon = ({ size = 18 }) => (
-  <svg {...iconProps(size)}>
-    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-    <polyline points="16 17 21 12 16 7" />
-    <line x1="21" y1="12" x2="9" y2="12" />
-  </svg>
-);
-
-const ServerIcon = ({ size = 18 }) => (
-  <svg {...iconProps(size)}>
-    <rect x="2" y="3" width="20" height="7" rx="2" />
-    <rect x="2" y="14" width="20" height="7" rx="2" />
-    <path d="M6 7h.01" />
-    <path d="M6 18h.01" />
-  </svg>
-);
-
-const UsersIcon = ({ size = 18 }) => (
-  <svg {...iconProps(size)}>
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-    <circle cx="9" cy="7" r="4" />
-    <path d="M23 21v-2a4 4 0 0 1-3-3.87" />
-    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-  </svg>
-);
-
-const CloseIcon = ({ size = 18 }) => (
-  <svg {...iconProps(size)}>
-    <path d="M18 6 6 18" />
-    <path d="M6 6l12 12" />
-  </svg>
-);
-
-const PlusIcon = ({ size = 18 }) => (
-  <svg {...iconProps(size)}>
-    <path d="M12 5v14" />
-    <path d="M5 12h14" />
-  </svg>
-);
-
-const CheckIcon = ({ size = 16 }) => (
-  <svg {...iconProps(size)}>
-    <path d="M20 6 9 17l-5-5" />
-  </svg>
-);
-
-const StarIcon = ({ size = 16, filled = false }) => (
-  <svg {...iconProps(size)} fill={filled ? '#37ff94' : 'none'} stroke={filled ? '#37ff94' : 'currentColor'}>
-    <path d="m12 2 3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14l-5-4.87 6.91-1.01L12 2Z" />
-  </svg>
-);
-
-const RadioIcon = ({ size = 18 }) => (
-  <svg {...iconProps(size)}>
-    <circle cx="12" cy="12" r="2" />
-    <path d="M16.24 7.76a6 6 0 0 1 0 8.49" />
-    <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-  </svg>
-);
-
-const GridIcon = ({ size = 18 }) => (
-  <svg {...iconProps(size)}>
-    <rect x="3" y="3" width="7" height="7" rx="1.5" />
-    <rect x="14" y="3" width="7" height="7" rx="1.5" />
-    <rect x="3" y="14" width="7" height="7" rx="1.5" />
-    <rect x="14" y="14" width="7" height="7" rx="1.5" />
-  </svg>
-);
-
-const SingleIcon = ({ size = 18 }) => (
-  <svg {...iconProps(size)}>
-    <rect x="3" y="4" width="18" height="16" rx="2" />
-  </svg>
-);
-
-const SplitIcon = ({ size = 18 }) => (
-  <svg {...iconProps(size)}>
-    <rect x="3" y="4" width="18" height="16" rx="2" />
-    <path d="M12 4v16" />
-  </svg>
-);
-
-const WinMinIcon = () => (
-  <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-    <path d="M0 5h10" stroke="currentColor" strokeWidth="1.2" />
-  </svg>
-);
-
-const WinMaxIcon = ({ maximized = false }) => (
-  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true">
-    {maximized ? (
-      <>
-        <rect x="0.6" y="2.4" width="7" height="7" />
-        <path d="M2.4 2.4V0.6h7v7H7.6" />
-      </>
-    ) : (
-      <rect x="0.6" y="0.6" width="8.8" height="8.8" />
-    )}
-  </svg>
-);
-
-const WinCloseIcon = () => (
-  <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-    <path d="M0 0l10 10M10 0L0 10" stroke="currentColor" strokeWidth="1.2" />
-  </svg>
-);
+import {
+  GearIcon, ExpandIcon, ShrinkIcon, EyeIcon, EyeOffIcon, CameraIcon, MonitorIcon,
+  PlugIcon, LogOutIcon, ServerIcon, UsersIcon, CloseIcon, PlusIcon, CheckIcon,
+  StarIcon, RadioIcon, GridIcon, SingleIcon, SplitIcon, WinMinIcon, WinMaxIcon,
+  WinCloseIcon,
+} from './icons.jsx';
+import {
+  ICE_SERVERS, QUALITIES, makeId, getQuality, configureSender, processCleanAudioStream,
+} from './lib/media.js';
+import { normalizeServer, cleanDomainOnly, formatUserList } from './lib/format.js';
+import { startWasapiAudioTrack } from './lib/wasapi-audio.js';
+import { hasAndroidScreenCapture, startAndroidScreenCapture } from './lib/android-screen.js';
 
 // The BrowserWindow is frameless, so the drag region and window buttons live here.
 function CameraPreview({ deviceId }) {
@@ -406,19 +159,6 @@ function HiddenVisual({ label = 'Prévia oculta', onReveal }) {
       )}
     </div>
   );
-}
-
-function normalizeServer(value) {
-  const clean = value.trim().replace(/\/$/, '');
-  if (!clean) return '';
-  if (clean.startsWith('ws://') || clean.startsWith('wss://')) return clean;
-  if (clean.startsWith('http://')) return `ws://${clean.slice(7)}`;
-  if (clean.startsWith('https://')) return `wss://${clean.slice(8)}`;
-  return `ws://${clean}`;
-}
-
-function cleanDomainOnly(url) {
-  return normalizeServer(url).replace(/^wss?:\/\//, '').replace(/^https?:\/\//, '');
 }
 
 function StreamCard({ item, active, collapsed, onSelect, onStop, onVolumeChange, onToggleHidden }) {
@@ -591,9 +331,9 @@ function App() {
   const [hostBusy, setHostBusy] = useState(false);
   const [tunnelProviders, setTunnelProviders] = useState(null);
   const [tunnelInstall, setTunnelInstall] = useState(null); // null | pct | "erro"
-  const hasAndroidScreenCapture = typeof window !== 'undefined' && !!window.greenlabsMobile?.isAvailable?.();
+  const androidScreen = hasAndroidScreenCapture();
   const canShareScreen = (typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getDisplayMedia)
-    || hasAndroidScreenCapture;
+    || androidScreen;
   const canHost = !!(typeof window !== 'undefined' && window.greenlabsApp?.startHost);
   const [copied, setCopied] = useState('');
   const [gridSlots, setGridSlots] = useState(() => {
@@ -980,181 +720,15 @@ function App() {
   // capture exclusion (Discord's own system playback is untouched, so you
   // still hear it normally) - not a mute, which is why it replaces the old
   // startExclusion/mute-audio.ps1 approach for screen-share audio.
-  const startWasapiAudioTrack = async () => {
-    const resp = await fetch(`http://127.0.0.1:25641/audio/?t=${Date.now()}`);
-    if (!resp.ok || !resp.body) throw new Error('WASAPI audio endpoint unavailable');
-
-    const sampleRate = Number(resp.headers.get('X-Sample-Rate')) || 48000;
-    const channels = Math.max(1, Number(resp.headers.get('X-Channels')) || 2);
-
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate });
-    const dest = audioCtx.createMediaStreamDestination();
-    // AudioWorkletNode runs on the realtime audio thread, so main-thread jank
-    // (UI work, GC) can't turn into irregular packet timing - that was feeding
-    // WebRTC's jitter buffer bursts, making it grow the playout delay to
-    // compensate. See wasapi-audio-worklet.js for the ring buffer itself.
-    await audioCtx.audioWorklet.addModule('./wasapi-audio-worklet.js');
-    const node = new AudioWorkletNode(audioCtx, 'wasapi-audio-processor', {
-      numberOfInputs: 0,
-      numberOfOutputs: 1,
-      outputChannelCount: [channels],
-      processorOptions: { channels, sampleRate },
-    });
-    node.connect(dest);
-
-    const reader = resp.body.getReader();
-    let leftover = new Uint8Array(0);
-    let stopped = false;
-
-    (async () => {
-      try {
-        while (!stopped) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          let combined = value;
-          if (leftover.length) {
-            combined = new Uint8Array(leftover.length + value.length);
-            combined.set(leftover, 0);
-            combined.set(value, leftover.length);
-          }
-          const frameBytes = 4 * channels;
-          const usableFrames = Math.floor(combined.length / frameBytes);
-          const usableBytes = usableFrames * frameBytes;
-          const view = new DataView(combined.buffer, combined.byteOffset, usableBytes);
-          const perChannel = Array.from({ length: channels }, () => new Float32Array(usableFrames));
-          for (let f = 0; f < usableFrames; f++) {
-            for (let ch = 0; ch < channels; ch++) {
-              perChannel[ch][f] = view.getFloat32((f * channels + ch) * 4, true);
-            }
-          }
-          leftover = combined.slice(usableBytes);
-          if (usableFrames > 0) {
-            node.port.postMessage(perChannel, perChannel.map((a) => a.buffer));
-          }
-        }
-      } catch {}
-    })();
-
-    const audioTrack = dest.stream.getAudioTracks()[0];
-    const cleanup = () => {
-      stopped = true;
-      try { reader.cancel(); } catch {}
-      try { node.disconnect(); } catch {}
-      try { audioCtx.close(); } catch {}
-    };
-    return { audioTrack, cleanup };
-  };
-
-  // Android has no getDisplayMedia (no browser implements it there), so there is
-  // no track to grab directly. The native side captures via MediaProjection and
-  // pushes JPEG frames over a loopback HTTP stream - framed the same way the
-  // WASAPI audio endpoint is (4-byte length + payload). Drawing each frame onto
-  // a canvas and reading it back with captureStream() turns that into a real
-  // MediaStream, so it plugs into addLocalStream() exactly like a camera does;
-  // nothing downstream needs to know the source wasn't getDisplayMedia.
+  // Ponte para a captura nativa do Android (ver lib/android-screen.js).
   const startAndroidScreen = async () => {
-    const bridge = window.greenlabsMobile;
     const quality = getQuality(screenQualityId);
-    const width = Math.min(quality.width, 1280);
-    const height = Math.min(quality.height, 720);
-    const fps = Math.min(quality.fps, 15);
-
-    const port = await new Promise((resolve, reject) => {
-      window.__glScreenReady = (p) => resolve(p);
-      window.__glScreenError = (msg) => reject(new Error(msg || 'falha ao capturar a tela'));
-      bridge.requestScreenCapture(width, height, fps);
+    const { stream, width, height, fps } = await startAndroidScreenCapture({
+      quality,
+      onDropped: (msg) => setShareError(msg),
     });
-
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx2d = canvas.getContext('2d');
-    const canvasStream = canvas.captureStream(fps);
-    const videoTrack = canvasStream.getVideoTracks()[0];
-
-    // The native server socket is bound before onReady fires, but connecting
-    // right as the service/foreground-notification machinery is still
-    // settling has been flaky in practice - a couple of quick retries costs
-    // nothing and covers that without masking a real failure.
-    let resp;
-    let lastErr;
-    for (let attempt = 0; attempt < 4; attempt++) {
-      try {
-        resp = await fetch(`http://127.0.0.1:${port}/stream`);
-        if (resp.ok && resp.body) { lastErr = null; break; }
-        lastErr = new Error(`stream respondeu ${resp.status}`);
-      } catch (err) {
-        lastErr = err;
-      }
-      await new Promise((r) => setTimeout(r, 150 * (attempt + 1)));
-    }
-    if (lastErr) throw lastErr;
-
-    const reader = resp.body.getReader();
-    let buffer = new Uint8Array(0);
-    let stopped = false;
-    let lastDrawAt = 0;
-    const minDrawIntervalMs = 1000 / fps;
-
-    const teardownOnError = (err) => {
-      if (stopped) return;
-      stopped = true;
-      console.warn('Android screen stream dropped:', err);
-      setShareError('A transmissão de tela caiu no meio do caminho.');
-      try { reader.cancel(); } catch {}
-      try { videoTrack.stop(); } catch {}
-      bridge.stopScreenCapture?.();
-    };
-
-    (async () => {
-      try {
-        while (!stopped) {
-          const { value, done } = await reader.read();
-          if (done) { teardownOnError(new Error('stream encerrado pelo lado nativo')); break; }
-          const merged = new Uint8Array(buffer.length + value.length);
-          merged.set(buffer, 0);
-          merged.set(value, buffer.length);
-          buffer = merged;
-
-          while (buffer.length >= 4) {
-            const len = new DataView(buffer.buffer, buffer.byteOffset, 4).getUint32(0, false);
-            if (buffer.length < 4 + len) break;
-            const jpegBytes = buffer.slice(4, 4 + len);
-            buffer = buffer.slice(4 + len);
-            // Frames can arrive in bursts (network/scheduling jitter) - drawing
-            // every one the instant it decodes makes the canvas sit still for a
-            // stretch and then jump, which reads as the picture "teleporting".
-            // Pacing draws to the target interval and dropping the rest between
-            // them keeps captureStream() sampling something closer to a steady
-            // cadence instead of a stale frame followed by a jump.
-            const now = performance.now();
-            if (now - lastDrawAt < minDrawIntervalMs) continue;
-            lastDrawAt = now;
-            try {
-              const bitmap = await createImageBitmap(new Blob([jpegBytes], { type: 'image/jpeg' }));
-              ctx2d.drawImage(bitmap, 0, 0, width, height);
-              bitmap.close();
-            } catch {}
-          }
-        }
-      } catch (err) {
-        teardownOnError(err);
-      }
-    })();
-
-    window.__glScreenStopped = () => {
-      try { videoTrack.stop(); } catch {}
-    };
-    videoTrack.addEventListener('ended', () => {
-      if (stopped) return;
-      stopped = true;
-      try { reader.cancel(); } catch {}
-      bridge.stopScreenCapture?.();
-    });
-
-    if (stopped) throw new Error('a captura caiu antes de começar a transmitir');
     const count = localStreamsRef.current.filter((i) => i.kind === 'screen').length + 1;
-    await addLocalStream('screen', `Tela ${count} - ${quality.label}`, canvasStream, { ...quality, width, height, fps });
+    await addLocalStream('screen', `Tela ${count} - ${quality.label}`, stream, { ...quality, width, height, fps });
     setShowLiveBanner(true);
   };
 
@@ -1370,7 +944,6 @@ function App() {
     }
     return <VideoPlayer stream={item.stream} muted={item.local} volume={item.volume} className="tile-video" />;
   };
-
 
   return (
     <main className="shell single-layout">

@@ -128,27 +128,31 @@ Servidor em rede local por IP só funciona pelo app.
 
 ## Compartilhar tela: onde funciona
 
-| Plataforma | Compartilhar tela | Motivo |
-|---|---|---|
-| App Windows | ✅ | `getDisplayMedia` + WASAPI |
-| Chrome/Edge/Firefox desktop (HTTPS) | ✅ | `getDisplayMedia` disponível |
-| Safari desktop | ✅ | `getDisplayMedia` disponível |
-| Qualquer navegador em HTTP | ❌ | exige secure context |
-| **Android (qualquer navegador)** | ❌ | `getDisplayMedia` não é implementado |
-| **App Android (WebView)** | ❌ | mesma limitação |
-| iOS / iPadOS Safari | ❌ | não implementado |
+| Plataforma | Compartilhar tela | Qualidade | Motivo |
+|---|---|---|---|
+| App Windows | ✅ | até 1080p 60fps | `getDisplayMedia` + WASAPI |
+| **[App Android](https://github.com/gustavo-blacknaut/greenlabs-live-streaming-mobile)** | ✅ | até 720p 15fps | `MediaProjection` nativo |
+| Chrome/Edge/Firefox desktop (HTTPS) | ✅ | até 1080p 60fps | `getDisplayMedia` disponível |
+| Safari desktop | ✅ | até 1080p 60fps | `getDisplayMedia` disponível |
+| Qualquer navegador em HTTP | ❌ | — | exige secure context |
+| Android pelo navegador | ❌ | — | `getDisplayMedia` não é implementado |
+| iOS / iPadOS Safari | ❌ | — | não implementado |
 
-O bloqueio no Android não é do WebView: o
-[caniuse](https://caniuse.com/mdn-api_mediadevices_getdisplaymedia) marca
-`getDisplayMedia` como não suportado em Chrome for Android, Android Browser e
-Samsung Internet. Captura de tela segue sendo um recurso de desktop na web.
+Nenhum navegador Android implementa `getDisplayMedia` — o
+[caniuse](https://caniuse.com/mdn-api_mediadevices_getdisplaymedia) marca como
+não suportado em Chrome for Android, Android Browser e Samsung Internet. Não é
+limitação do WebView, é da plataforma inteira para conteúdo web.
 
-O Android **tem** como capturar a tela nativamente (`MediaProjection`), mas os
-frames ficam no lado nativo e a conexão WebRTC do app vive dentro do WebView.
-Ligar um no outro exigiria trocar o WebView por um cliente WebRTC nativo
-(`org.webrtc`) e reimplementar a sinalização em Java — não é um ajuste, é outro
-aplicativo. Por isso o cliente Android hoje é para assistir e participar com
-câmera e microfone.
+Por isso o **app Android** não usa a API do navegador: ele captura pelo
+`MediaProjection` nativo (o mesmo que Discord e Zoom usam), entrega os frames ao
+WebView por um servidor HTTP local, e o lado web transforma isso numa
+`MediaStream` de verdade via `canvas.captureStream()`.
+
+A resolução é menor que no desktop de propósito: os frames são codificados em
+JPEG por software, não por hardware, então 720p/15fps é o limite razoável antes
+do consumo de CPU e bateria ficar alto demais num celular. O Android também
+exige uma notificação persistente enquanto a tela está sendo transmitida — é
+política da plataforma, não dá para remover.
 
 ---
 
@@ -300,19 +304,32 @@ Recomendações:
 
 ### Máquina de quem hospeda o servidor
 
-O servidor de sinalização é muito leve. O gargalo é a **banda de upload de quem
-transmite**, não o servidor.
+O servidor de sinalização é **muito** leve — o gargalo é a banda de upload de
+quem transmite, não o servidor.
 
-| Participantes | CPU | RAM | Banda do servidor |
-|---|---|---|---|
-| até 4 | 1 core | 512 MB | 1 Mbps |
-| até 8 | 1 core | 1 GB | 2 Mbps |
-| até 16 | 2 cores | 2 GB | 5 Mbps |
-| até 30 | 2 cores | 4 GB | 10 Mbps |
+Números medidos rodando o servidor de verdade e conectando N participantes que
+trocam sinalização e pingam a cada segundo (`process.memoryUsage()` para a
+memória, bytes contados no socket para a banda):
 
-> Esses números são só para a sinalização. Uma VPS de R$ 20/mês aguenta
-> tranquilamente 16 pessoas. O que costuma limitar não é o servidor, e sim a
-> porta disponível na hospedagem e o upload de quem transmite.
+| Participantes | RAM (RSS) | Banda de sinalização |
+|---|---|---|
+| ocioso, ninguém conectado | 49 MB | — |
+| 4 | 50 MB | 9 kbps |
+| 8 | 51 MB | 30 kbps |
+| 16 | 51 MB | 103 kbps |
+| 30 | 56 MB | 338 kbps |
+
+Quase toda essa memória é o próprio runtime do Node: 30 participantes custam
+cerca de **7 MB acima do servidor vazio**. Um core basta em qualquer um desses
+cenários — o processo fica ocioso a maior parte do tempo, só repassando
+mensagens pequenas.
+
+> Uma versão anterior deste README trazia uma tabela pedindo até 4 GB de RAM
+> para 30 pessoas. Aquilo era estimativa, não medição, e estava errado por uma
+> ordem de grandeza enorme. Os números acima vieram de medir.
+
+O que costuma limitar não é o servidor, e sim a porta disponível na hospedagem
+e o upload de quem transmite.
 
 ### Máquina de quem transmite
 
@@ -370,8 +387,14 @@ electron/
   AudioCapture.cs     captura de áudio por processo (WASAPI)
   AudioCapture.exe    binário compilado do arquivo acima
 src/
-  main.jsx            interface e toda a lógica de WebRTC
+  main.jsx            componente da chamada: estado, WebRTC e a interface
+  icons.jsx           ícones SVG
   styles.css
+  lib/
+    media.js          perfis de qualidade, ICE, ajuste do sender
+    format.js         normalização do endereço e lista de participantes
+    wasapi-audio.js   áudio do sistema sem o Discord (Windows)
+    android-screen.js ponte para a captura de tela nativa do Android
 server/
   signaling.js        servidor WebSocket (exporta startSignaling)
   tunnel.js           endereços da rede e cloudflared/ngrok
