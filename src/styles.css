@@ -1886,3 +1886,62 @@ h2 {
     padding: 14px;
   }
 }
+
+/* --- Hosting tab --- */
+.host-address {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.host-address.highlight {
+  border-color: var(--green-line);
+  background: var(--green-soft);
+}
+
+.host-address-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.host-address-text strong {
+  font-size: 0.84rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.host-address-text span {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.host-address-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.host-address-actions .ghost {
+  padding: 6px 12px;
+  font-size: 0.76rem;
+}
+
+.host-tunnel-row {
+  align-self: end;
+  margin: 0;
+  padding: 12px 13px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.035);
+  cursor: pointer;
+}

@@ -17,6 +17,8 @@ servidor só serve para as pessoas se encontrarem.
 - [Como funciona](#como-funciona)
 - [Instalação](#instalação)
 - [Hospedando o servidor](#hospedando-o-servidor)
+  - [Pelo aplicativo (mais simples)](#pelo-aplicativo-mais-simples)
+  - [Pelo terminal](#pelo-terminal)
   - [Sobre a porta](#sobre-a-porta)
   - [1. Mesma rede (LAN)](#1-mesma-rede-lan)
   - [2. Radmin VPN / Hamachi](#2-radmin-vpn--hamachi)
@@ -88,7 +90,29 @@ O `.exe` sai em `dist-installer/`.
 
 ## Hospedando o servidor
 
-Escolha um dos quatro caminhos abaixo. Todos usam o mesmo comando de base:
+### Pelo aplicativo (mais simples)
+
+Abra **Configuração → Hospedar**, escolha a porta, marque **Abrir túnel** se
+quiser acesso pela internet, e clique em **Iniciar servidor**.
+
+O servidor roda dentro do próprio GreenLabs — não precisa de terminal nem de
+Node instalado. A aba lista os endereços prontos para compartilhar, com botão de
+copiar, e um botão **Usar** para você mesmo entrar no seu servidor.
+
+Endereços marcados com **VPN** são de Radmin VPN ou Hamachi. Se o túnel estiver
+ativo, o endereço público (`wss://...`) aparece destacado no topo.
+
+Clicar em **Parar servidor** encerra tudo e libera a porta.
+
+### Pelo terminal
+
+Para hospedar sem abrir a interface — em uma VPS, por exemplo:
+
+```bash
+npm run host
+```
+
+Ele sobe o servidor e lista os endereços que você pode compartilhar:
 
 ```bash
 npm run host
@@ -360,8 +384,9 @@ src/
   main.jsx            interface e toda a lógica de WebRTC
   styles.css
 server/
-  signaling.js        servidor WebSocket
-  host.js             wrapper com endereços de rede e túnel
+  signaling.js        servidor WebSocket (exporta startSignaling)
+  tunnel.js           endereços da rede e cloudflared/ngrok
+  host.js             CLI de hospedagem
 ```
 
 Recompilando a captura de áudio depois de mexer no `.cs`:

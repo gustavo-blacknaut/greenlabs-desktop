@@ -571,6 +571,15 @@ function App() {
   const [obServer, setObServer] = useState('');
   const [obRoom, setObRoom] = useState('call1');
   const [cameraPicker, setCameraPicker] = useState(null); // { devices, selectedId }
+  const [hostState, setHostState] = useState(null);
+  const [hostPort, setHostPort] = useState(() => {
+    try { return localStorage.getItem('greenlabs:hostPort') || '25640'; } catch { return '25640'; }
+  });
+  const [hostTunnel, setHostTunnel] = useState(() => {
+    try { return localStorage.getItem('greenlabs:hostTunnel') === '1'; } catch { return false; }
+  });
+  const [hostBusy, setHostBusy] = useState(false);
+  const [copied, setCopied] = useState('');
   const [gridSlots, setGridSlots] = useState(() => {
     try { return Number(localStorage.getItem('greenlabs:gridSlots')) || 1; } catch { return 1; }
   });
@@ -706,6 +715,15 @@ function App() {
   useEffect(() => { try { localStorage.setItem('greenlabs:servers', JSON.stringify(servers)); } catch {} }, [servers]);
   useEffect(() => { try { localStorage.setItem('greenlabs:hwAccel', String(hwAccel)); } catch {} }, [hwAccel]);
   useEffect(() => { try { localStorage.setItem('greenlabs:gridSlots', String(gridSlots)); } catch {} }, [gridSlots]);
+  useEffect(() => { try { localStorage.setItem('greenlabs:hostPort', hostPort); } catch {} }, [hostPort]);
+  useEffect(() => { try { localStorage.setItem('greenlabs:hostTunnel', hostTunnel ? '1' : '0'); } catch {} }, [hostTunnel]);
+
+  useEffect(() => {
+    const api = window.greenlabsApp;
+    if (!api?.getHostState) return;
+    api.getHostState().then(setHostState).catch(() => {});
+    api.onHostState?.(setHostState);
+  }, []);
   useEffect(() => { try { localStorage.setItem('greenlabs:shareAudio', shareAudioEnabled ? '1' : '0'); } catch {} }, [shareAudioEnabled]);
   useEffect(() => { try { localStorage.setItem('greenlabs:audioFilterMode', audioFilterMode); } catch {} }, [audioFilterMode]);
   useEffect(() => { try { localStorage.setItem('greenlabs:excludedAudioApps', excludedAudioApps); } catch {} }, [excludedAudioApps]);
@@ -1050,6 +1068,33 @@ function App() {
     } catch (err) {}
   };
 
+  const toggleHost = async () => {
+    const api = window.greenlabsApp;
+    if (!api?.startHost) return;
+    setHostBusy(true);
+    try {
+      if (hostState?.running) {
+        setHostState(await api.stopHost());
+      } else {
+        setHostState(await api.startHost({ port: Number(hostPort) || 25640, tunnel: hostTunnel }));
+      }
+    } catch {}
+    setHostBusy(false);
+  };
+
+  const copyAddress = async (value) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(value);
+      setTimeout(() => setCopied(''), 1500);
+    } catch {}
+  };
+
+  const useOwnServer = (value) => {
+    setServerUrl(value);
+    setShowConfig(false);
+  };
+
   const startCamera = async () => {
     try {
       // A permission grant is needed before labels are populated.
@@ -1338,6 +1383,9 @@ function App() {
               <button className={`tab-btn ${configTab === 'connection' ? 'active' : ''}`} onClick={() => setConfigTab('connection')}>
                 <PlugIcon size={15} /> <span>Conexão & Áudio</span>
               </button>
+              <button className={`tab-btn ${configTab === 'host' ? 'active' : ''}`} onClick={() => setConfigTab('host')}>
+                <RadioIcon size={15} /> <span>Hospedar{hostState?.running ? ' •' : ''}</span>
+              </button>
               <button className={`tab-btn ${configTab === 'servers' ? 'active' : ''}`} onClick={() => setConfigTab('servers')}>
                 <ServerIcon size={15} /> <span>Servidores ({servers.length})</span>
               </button>
@@ -1414,6 +1462,91 @@ function App() {
                     <button className="ghost" onClick={() => setFavoriteServer(serverUrl, roomId)}><StarIcon size={15} filled={true} /> Salvar atual como padrão</button>
                     <button className="ghost" onClick={restoreFactory}>Restaurar fábrica</button>
                   </div>
+                </div>
+              )}
+
+              {configTab === 'host' && (
+                <div className="field-grid">
+                  <div className="block-title"><RadioIcon size={15} /> <span>Hospedar do meu PC</span></div>
+                  <p className="hint">
+                    Sobe o servidor de sinalização aqui mesmo. Quem for entrar usa um dos
+                    endereços abaixo — vídeo e áudio vão direto entre vocês.
+                  </p>
+
+                  <div className="split-fields">
+                    <label>Porta
+                      <input
+                        value={hostPort}
+                        onChange={(e) => setHostPort(e.target.value.replace(/\D/g, '').slice(0, 5))}
+                        placeholder="25640"
+                        disabled={hostState?.running}
+                      />
+                    </label>
+                    <label className="check-row host-tunnel-row" onClick={() => { if (!hostState?.running) setHostTunnel((v) => !v); }}>
+                      <span className={`switch ${hostTunnel ? 'on' : ''}`} />
+                      Abrir túnel
+                    </label>
+                  </div>
+
+                  <p className="hint">
+                    Sem túnel funciona na mesma rede ou por Radmin VPN. Com túnel, o endereço
+                    fica acessível pela internet (precisa de cloudflared ou ngrok instalado).
+                  </p>
+
+                  <button
+                    className={`full-btn ${hostState?.running ? 'ghost' : 'primary'}`}
+                    disabled={hostBusy}
+                    onClick={toggleHost}
+                  >
+                    {hostBusy ? 'Aguarde...' : hostState?.running ? 'Parar servidor' : 'Iniciar servidor'}
+                  </button>
+
+                  {hostState?.running && (
+                    <>
+                      <hr className="divider" />
+                      <div className="block-title"><PlugIcon size={15} /> <span>Endereços para compartilhar</span></div>
+
+                      {hostState.tunnelUrl && (
+                        <div className="host-address highlight">
+                          <div className="host-address-text">
+                            <strong>{hostState.tunnelUrl}</strong>
+                            <span>Internet — via {hostState.tunnel}</span>
+                          </div>
+                          <div className="host-address-actions">
+                            <button className="icon-btn sm" title="Copiar" onClick={() => copyAddress(hostState.tunnelUrl)}>
+                              {copied === hostState.tunnelUrl ? <CheckIcon size={15} /> : <PlusIcon size={15} />}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {hostTunnel && !hostState.tunnelUrl && !hostState.tunnelError && (
+                        <p className="hint">Abrindo túnel...</p>
+                      )}
+
+                      {hostState.tunnelError && (
+                        <p className="hint">Túnel indisponível: {hostState.tunnelError}. Use os endereços locais ou Radmin VPN.</p>
+                      )}
+
+                      {(hostState.addresses || []).map((item) => {
+                        const url = `ws://${item.address}:${hostState.port}`;
+                        return (
+                          <div className="host-address" key={url}>
+                            <div className="host-address-text">
+                              <strong>{url}</strong>
+                              <span>{item.name}{item.vpn ? ' — VPN' : ''}</span>
+                            </div>
+                            <div className="host-address-actions">
+                              <button className="icon-btn sm" title="Copiar" onClick={() => copyAddress(url)}>
+                                {copied === url ? <CheckIcon size={15} /> : <PlusIcon size={15} />}
+                              </button>
+                              <button className="ghost" title="Usar este servidor" onClick={() => useOwnServer(url)}>Usar</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
                 </div>
               )}
 

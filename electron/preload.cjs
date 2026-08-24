@@ -29,4 +29,8 @@ contextBridge.exposeInMainWorld('greenlabsApp', {
   closeWindow: () => ipcRenderer.send('greenlabs:window-close'),
   isMaximized: () => ipcRenderer.invoke('greenlabs:window-is-maximized'),
   onWindowStateChange: (cb) => ipcRenderer.on('greenlabs:window-state', (_e, maximized) => cb(maximized)),
+  startHost: (opts) => ipcRenderer.invoke('greenlabs:host-start', opts),
+  stopHost: () => ipcRenderer.invoke('greenlabs:host-stop'),
+  getHostState: () => ipcRenderer.invoke('greenlabs:host-state'),
+  onHostState: (cb) => ipcRenderer.on('greenlabs:host-state', (_e, state) => cb(state)),
 });

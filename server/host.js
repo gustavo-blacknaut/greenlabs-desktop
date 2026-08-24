@@ -1,16 +1,11 @@
-// Starts the signaling server and, when asked, exposes it through a tunnel so
-// people outside the LAN can join without port forwarding.
+// CLI para hospedar a sinalização fora do app.
 //
-//   node server/host.js                 -> LAN only
-//   node server/host.js --tunnel        -> auto-detect cloudflared or ngrok
-//   node server/host.js --tunnel=ngrok  -> force a provider
-//   node server/host.js --port 25640
-import { spawn } from 'node:child_process';
-import { networkInterfaces } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
-
-const here = path.dirname(fileURLToPath(import.meta.url));
+//   node server/host.js                 -> só a rede local
+//   node server/host.js --tunnel        -> detecta cloudflared ou ngrok
+//   node server/host.js --tunnel=ngrok  -> força um provedor
+//   node server/host.js --port 30000
+import { startSignaling } from './signaling.js';
+import { localAddresses, resolveProvider, startTunnel } from './tunnel.js';
 
 function parseArgs(argv) {
   const out = { port: Number(process.env.PORT || 25640), tunnel: null };
@@ -30,125 +25,52 @@ function parseArgs(argv) {
   return out;
 }
 
-function localAddresses() {
-  const found = [];
-  const nets = networkInterfaces();
-  for (const [name, addrs] of Object.entries(nets)) {
-    for (const addr of addrs || []) {
-      if (addr.family === 'IPv4' && !addr.internal) {
-        found.push({ name, address: addr.address });
-      }
-    }
-  }
-  // Radmin VPN and Hamachi hand out addresses in these ranges; they are the
-  // usual way people here play together without opening ports, so surface them
-  // separately instead of burying them in the list.
-  const vpnLike = (ip) => ip.startsWith('26.') || ip.startsWith('25.');
-  return {
-    vpn: found.filter((f) => vpnLike(f.address)),
-    lan: found.filter((f) => !vpnLike(f.address)),
-  };
-}
-
-function which(cmd) {
-  return new Promise((resolve) => {
-    const probe = spawn(process.platform === 'win32' ? 'where' : 'which', [cmd]);
-    let hit = false;
-    probe.stdout.on('data', () => { hit = true; });
-    probe.on('close', () => resolve(hit));
-    probe.on('error', () => resolve(false));
-  });
-}
-
-async function pickTunnelProvider(requested) {
-  if (requested && requested !== 'auto') {
-    const ok = await which(requested === 'cloudflare' ? 'cloudflared' : requested);
-    if (!ok) {
-      console.error(`[host] "${requested}" nao encontrado no PATH.`);
-      return null;
-    }
-    return requested === 'cloudflare' ? 'cloudflared' : requested;
-  }
-  if (await which('cloudflared')) return 'cloudflared';
-  if (await which('ngrok')) return 'ngrok';
-  return null;
-}
-
-// Both providers print the public URL to stdout/stderr; catching it there keeps
-// this dependency-free instead of polling their local APIs.
-function startTunnel(provider, port) {
-  const args = provider === 'cloudflared'
-    ? ['tunnel', '--url', `http://localhost:${port}`]
-    : ['http', String(port), '--log', 'stdout'];
-
-  const proc = spawn(provider, args);
-  const urlPattern = provider === 'cloudflared'
-    ? /https:\/\/[a-z0-9-]+\.trycloudflare\.com/i
-    : /https:\/\/[a-z0-9-]+\.ngrok[-a-z0-9.]*\.(app|io|dev)/i;
-
-  let announced = false;
-  const scan = (chunk) => {
-    const text = chunk.toString();
-    if (announced) return;
-    const match = text.match(urlPattern);
-    if (!match) return;
-    announced = true;
-    const wsUrl = match[0].replace(/^https/, 'wss');
-    console.log('');
-    console.log('  Tunnel ativo. Compartilhe este endereco:');
-    console.log(`    ${wsUrl}`);
-    console.log('');
-    console.log('  Cole no campo "Servidor" do GreenLabs (com ou sem wss://).');
-    console.log('');
-  };
-
-  proc.stdout.on('data', scan);
-  proc.stderr.on('data', scan);
-  proc.on('error', (err) => console.error(`[host] tunnel falhou: ${err.message}`));
-  proc.on('close', (code) => {
-    if (code !== 0) console.error(`[host] tunnel encerrou com codigo ${code}`);
-  });
-
-  return proc;
-}
-
 async function main() {
   const { port, tunnel } = parseArgs(process.argv.slice(2));
 
-  const signaling = spawn(process.execPath, [path.join(here, 'signaling.js')], {
-    stdio: 'inherit',
-    env: { ...process.env, PORT: String(port) },
-  });
+  await startSignaling({ port });
 
-  const { vpn, lan } = localAddresses();
+  const addresses = localAddresses();
   console.log('');
   console.log('  Enderecos para quem esta na mesma rede:');
-  for (const item of vpn) console.log(`    ws://${item.address}:${port}   (${item.name} - VPN)`);
-  for (const item of lan) console.log(`    ws://${item.address}:${port}   (${item.name})`);
-  if (!vpn.length && !lan.length) console.log('    nenhuma interface de rede encontrada');
+  for (const item of addresses) {
+    console.log(`    ws://${item.address}:${port}   (${item.name}${item.vpn ? ' - VPN' : ''})`);
+  }
+  if (!addresses.length) console.log('    nenhuma interface de rede encontrada');
   console.log('');
 
   let tunnelProc = null;
   if (tunnel) {
-    const provider = await pickTunnelProvider(tunnel);
-    if (provider) {
-      console.log(`  Abrindo tunnel via ${provider}...`);
-      tunnelProc = startTunnel(provider, port);
-    } else {
+    const provider = await resolveProvider(tunnel);
+    if (!provider) {
       console.log('  Nenhum tunnel disponivel. Instale cloudflared ou ngrok,');
       console.log('  ou use Radmin VPN / Hamachi com os enderecos acima.');
       console.log('');
+    } else {
+      console.log(`  Abrindo tunnel via ${provider}...`);
+      tunnelProc = startTunnel({
+        provider,
+        port,
+        onUrl: (url) => {
+          console.log('');
+          console.log('  Tunnel ativo. Compartilhe este endereco:');
+          console.log(`    ${url}`);
+          console.log('');
+        },
+        onError: (msg) => console.error(`[host] tunnel falhou: ${msg}`),
+        onExit: (code) => {
+          if (code !== 0) console.error(`[host] tunnel encerrou com codigo ${code}`);
+        },
+      });
     }
   }
 
   const shutdown = () => {
     try { tunnelProc?.kill(); } catch {}
-    try { signaling.kill(); } catch {}
     process.exit(0);
   };
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
-  signaling.on('close', shutdown);
 }
 
 main();

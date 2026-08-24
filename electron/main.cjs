@@ -291,6 +291,20 @@ function createWindow() {
     return mainWin ? mainWin.isMaximized() : false;
   });
 
+  ipcMain.handle('greenlabs:host-start', async (_e, opts) => {
+    try {
+      return await startHost(opts || {});
+    } catch (err) {
+      hostState.running = false;
+      hostState.tunnelError = err.message;
+      pushHostState();
+      return { ...hostState, error: err.message };
+    }
+  });
+
+  ipcMain.handle('greenlabs:host-stop', async () => stopHost());
+  ipcMain.handle('greenlabs:host-state', () => hostState);
+
   ipcMain.on('greenlabs:hide-to-tray', () => {
     if (mainWin) mainWin.hide();
   });
@@ -321,6 +335,92 @@ app.on('second-instance', () => {
     mainWin.focus();
   }
 });
+
+// Hospedagem embutida: o servidor de sinalização roda dentro do próprio
+// processo principal, então não depende de node instalado nem de arquivos
+// extraídos do asar. O túnel é um binário externo e continua sendo um filho.
+const hostState = {
+  running: false,
+  port: 25640,
+  tunnel: null,
+  tunnelUrl: null,
+  tunnelError: null,
+  addresses: [],
+};
+let signalingInstance = null;
+let tunnelProc = null;
+
+function pushHostState() {
+  if (mainWin && !mainWin.isDestroyed()) {
+    try { mainWin.webContents.send('greenlabs:host-state', hostState); } catch {}
+  }
+}
+
+async function loadServerModule(name) {
+  const url = require('node:url').pathToFileURL(path.join(__dirname, '..', 'server', name)).href;
+  return import(url);
+}
+
+async function startHost({ port, tunnel }) {
+  if (hostState.running) return hostState;
+
+  const { startSignaling } = await loadServerModule('signaling.js');
+  const { localAddresses, resolveProvider, startTunnel } = await loadServerModule('tunnel.js');
+
+  const chosenPort = Number(port) || 25640;
+  signalingInstance = await startSignaling({
+    port: chosenPort,
+    log: (msg) => console.log('[host]', msg),
+  });
+
+  hostState.running = true;
+  hostState.port = chosenPort;
+  hostState.addresses = localAddresses();
+  hostState.tunnel = null;
+  hostState.tunnelUrl = null;
+  hostState.tunnelError = null;
+  pushHostState();
+
+  if (tunnel) {
+    const provider = await resolveProvider('auto');
+    if (!provider) {
+      hostState.tunnelError = 'cloudflared/ngrok nao encontrado';
+      pushHostState();
+    } else {
+      hostState.tunnel = provider;
+      pushHostState();
+      tunnelProc = startTunnel({
+        provider,
+        port: chosenPort,
+        onUrl: (url) => { hostState.tunnelUrl = url; pushHostState(); },
+        onError: (msg) => { hostState.tunnelError = msg; pushHostState(); },
+        onExit: () => {
+          tunnelProc = null;
+          if (!hostState.tunnelUrl) hostState.tunnelError = hostState.tunnelError || 'tunnel encerrou';
+          pushHostState();
+        },
+      });
+    }
+  }
+
+  return hostState;
+}
+
+async function stopHost() {
+  try { tunnelProc?.kill(); } catch {}
+  tunnelProc = null;
+  if (signalingInstance) {
+    try { await signalingInstance.close(); } catch {}
+    signalingInstance = null;
+  }
+  hostState.running = false;
+  hostState.tunnel = null;
+  hostState.tunnelUrl = null;
+  hostState.tunnelError = null;
+  hostState.addresses = [];
+  pushHostState();
+  return hostState;
+}
 
 let wasapiProc = null;
 
@@ -367,6 +467,10 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+app.on('before-quit', () => {
+  try { tunnelProc?.kill(); } catch {}
 });
 
 app.on('window-all-closed', () => {
