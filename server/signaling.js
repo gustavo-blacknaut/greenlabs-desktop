@@ -2,8 +2,12 @@ import http from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { WebSocketServer } from 'ws';
+import { resolverPorta } from './env.js';
 
-export function startSignaling({ port = 25640, log = defaultLog } = {}) {
+export function startSignaling({ port, log = defaultLog } = {}) {
+  // A porta pode vir por argumento, por PORT no .env/ambiente, ou por
+  // SERVER_PORT (que é como o Pterodactyl entrega a porta alocada).
+  const portaFinal = resolverPorta(port);
   const rooms = new Map();
   const serverStats = {
     startedAt: new Date().toISOString(),
@@ -184,11 +188,11 @@ export function startSignaling({ port = 25640, log = defaultLog } = {}) {
 
   return new Promise((resolve, reject) => {
     server.once('error', reject);
-    server.listen(port, '0.0.0.0', () => {
+    server.listen(portaFinal, '0.0.0.0', () => {
       server.removeListener('error', reject);
-      log(`Servidor de Sinalizacao GreenLabs rodando em http://0.0.0.0:${port}`);
+      log(`Servidor de Sinalizacao GreenLabs rodando em http://0.0.0.0:${portaFinal}`);
       resolve({
-        port,
+        port: portaFinal,
         get rooms() {
           return rooms.size;
         },
@@ -212,8 +216,8 @@ function defaultLog(...args) {
 
 const isDirectRun = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isDirectRun) {
-  const port = Number(process.env.PORT || 25640);
-  startSignaling({ port }).then((instance) => {
+  // Sem porta explícita: quem resolve é o startSignaling, via PORT/SERVER_PORT.
+  startSignaling().then((instance) => {
     defaultLog(`Acesse http://localhost:${instance.port}/rooms para verificar estatisticas em PT-BR`);
   });
 }

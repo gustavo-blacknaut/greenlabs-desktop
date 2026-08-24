@@ -4,11 +4,18 @@
 //   node server/host.js --tunnel        -> detecta cloudflared ou ngrok
 //   node server/host.js --tunnel=ngrok  -> força um provedor
 //   node server/host.js --port 30000
+import { carregarEnv } from './env.js';
 import { startSignaling } from './signaling.js';
 import { localAddresses, resolveProvider, startTunnel } from './tunnel.js';
 
+// Antes de ler qualquer configuração: um .env na pasta do servidor deve valer
+// tanto para quem roda pelo terminal quanto para quem sobe por systemd/pm2.
+carregarEnv();
+
 function parseArgs(argv) {
-  const out = { port: Number(process.env.PORT || 25640), tunnel: null };
+  // port fica indefinido quando ninguém passa --port: aí startSignaling
+  // resolve por PORT/SERVER_PORT, sem duplicar a regra em dois lugares.
+  const out = { port: undefined, tunnel: null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--port') {
@@ -26,9 +33,12 @@ function parseArgs(argv) {
 }
 
 async function main() {
-  const { port, tunnel } = parseArgs(process.argv.slice(2));
+  const { port: portaPedida, tunnel } = parseArgs(process.argv.slice(2));
 
-  await startSignaling({ port });
+  // Usa a porta que o servidor realmente abriu: quando ninguém passa --port,
+  // quem decide é o startSignaling (via PORT/SERVER_PORT), e os endereços
+  // impressos e o túnel precisam apontar para a mesma.
+  const { port } = await startSignaling({ port: portaPedida });
 
   const addresses = localAddresses();
   console.log('');
