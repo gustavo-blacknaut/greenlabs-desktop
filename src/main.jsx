@@ -581,8 +581,9 @@ function App() {
   const [hostBusy, setHostBusy] = useState(false);
   const [tunnelProviders, setTunnelProviders] = useState(null);
   const [tunnelInstall, setTunnelInstall] = useState(null); // null | pct | "erro"
-  const canShareScreen = typeof navigator !== 'undefined'
-    && !!navigator.mediaDevices?.getDisplayMedia;
+  const hasAndroidScreenCapture = typeof window !== 'undefined' && !!window.greenlabsMobile?.isAvailable?.();
+  const canShareScreen = (typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getDisplayMedia)
+    || hasAndroidScreenCapture;
   const canHost = !!(typeof window !== 'undefined' && window.greenlabsApp?.startHost);
   const [copied, setCopied] = useState('');
   const [gridSlots, setGridSlots] = useState(() => {
@@ -1023,7 +1024,83 @@ function App() {
     return { audioTrack, cleanup };
   };
 
+  // Android has no getDisplayMedia (no browser implements it there), so there is
+  // no track to grab directly. The native side captures via MediaProjection and
+  // pushes JPEG frames over a loopback HTTP stream - framed the same way the
+  // WASAPI audio endpoint is (4-byte length + payload). Drawing each frame onto
+  // a canvas and reading it back with captureStream() turns that into a real
+  // MediaStream, so it plugs into addLocalStream() exactly like a camera does;
+  // nothing downstream needs to know the source wasn't getDisplayMedia.
+  const startAndroidScreen = async () => {
+    const bridge = window.greenlabsMobile;
+    const quality = getQuality(screenQualityId);
+    const width = Math.min(quality.width, 1280);
+    const height = Math.min(quality.height, 720);
+    const fps = Math.min(quality.fps, 15);
+
+    const port = await new Promise((resolve, reject) => {
+      window.__glScreenReady = (p) => resolve(p);
+      window.__glScreenError = (msg) => reject(new Error(msg || 'falha ao capturar a tela'));
+      bridge.requestScreenCapture(width, height, fps);
+    });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx2d = canvas.getContext('2d');
+    const canvasStream = canvas.captureStream(fps);
+    const videoTrack = canvasStream.getVideoTracks()[0];
+
+    const resp = await fetch(`http://127.0.0.1:${port}/stream`);
+    if (!resp.ok || !resp.body) throw new Error('stream de tela indisponível');
+    const reader = resp.body.getReader();
+    let buffer = new Uint8Array(0);
+    let stopped = false;
+
+    (async () => {
+      try {
+        while (!stopped) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          const merged = new Uint8Array(buffer.length + value.length);
+          merged.set(buffer, 0);
+          merged.set(value, buffer.length);
+          buffer = merged;
+
+          while (buffer.length >= 4) {
+            const len = new DataView(buffer.buffer, buffer.byteOffset, 4).getUint32(0, false);
+            if (buffer.length < 4 + len) break;
+            const jpegBytes = buffer.slice(4, 4 + len);
+            buffer = buffer.slice(4 + len);
+            try {
+              const bitmap = await createImageBitmap(new Blob([jpegBytes], { type: 'image/jpeg' }));
+              ctx2d.drawImage(bitmap, 0, 0, width, height);
+              bitmap.close();
+            } catch {}
+          }
+        }
+      } catch {}
+    })();
+
+    window.__glScreenStopped = () => {
+      try { videoTrack.stop(); } catch {}
+    };
+    videoTrack.addEventListener('ended', () => {
+      stopped = true;
+      try { reader.cancel(); } catch {}
+      bridge.stopScreenCapture?.();
+    });
+
+    const count = localStreamsRef.current.filter((i) => i.kind === 'screen').length + 1;
+    await addLocalStream('screen', `Tela ${count} - ${quality.label}`, canvasStream, { ...quality, width, height, fps });
+    setShowLiveBanner(true);
+  };
+
   const startScreen = async () => {
+    if (window.greenlabsMobile?.requestScreenCapture) {
+      try { await startAndroidScreen(); } catch (err) { setShareError('Não foi possível compartilhar a tela.'); }
+      return;
+    }
     const quality = getQuality(screenQualityId);
     try {
       const rawStream = await navigator.mediaDevices.getDisplayMedia({
