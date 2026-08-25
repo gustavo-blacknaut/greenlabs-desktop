@@ -328,63 +328,18 @@ namespace GreenLabsAudio {
 
         // Discord spans several processes: find the one rendering audio, then
         // climb to the topmost Discord ancestor and exclude that whole tree.
-        /// PIDs da nossa própria árvore (este processo, seus ancestrais e
-        /// descendentes). Nada aqui pode ser alvo da exclusão.
-        static HashSet<uint> SelfTree() {
-            var tree = new HashSet<uint>();
-            try {
-                uint self = (uint)Process.GetCurrentProcess().Id;
-                tree.Add(self);
-                var parents = ParentMap();
-
-                // Sobe até o topo: o Electron abre o capturador como filho,
-                // então o app inteiro precisa ficar de fora.
-                uint cur = self;
-                var guard = new HashSet<uint>();
-                while (guard.Add(cur)) {
-                    uint ppid;
-                    if (!parents.TryGetValue(cur, out ppid) || ppid == 0) break;
-                    if (!tree.Add(ppid)) break;
-                    cur = ppid;
-                }
-
-                // E desce: filhos de qualquer um que já esteja na árvore.
-                bool cresceu = true;
-                while (cresceu) {
-                    cresceu = false;
-                    foreach (var par in parents) {
-                        if (tree.Contains(par.Value) && tree.Add(par.Key)) cresceu = true;
-                    }
-                }
-            } catch { }
-            return tree;
-        }
-
         static uint FindExcludeRootPid() {
-            // O modo EXCLUDE aceita UMA árvore de processos. Se a nossa própria
-            // árvore entrar na lista de candidatos, o capturador exclui a si
-            // mesmo e o alvo de verdade (o Discord) passa direto - que é o
-            // sintoma de "o som do Discord voltou". Por isso a árvore do
-            // capturador nunca é candidata.
-            var selfTree = SelfTree();
-
-            var matched = new List<uint>();
+            var matched = new HashSet<uint>();
             foreach (var p in Process.GetProcesses()) {
                 try {
-                    uint pid = (uint)p.Id;
-                    if (selfTree.Contains(pid)) continue;
                     string n = p.ProcessName.ToLower();
                     foreach (var ex in _excludeApps) {
                         var t = ex.ToLower().Trim();
-                        if (t.Length > 0 && n.Contains(t)) { matched.Add(pid); break; }
+                        if (t.Length > 0 && n.Contains(t)) { matched.Add((uint)p.Id); break; }
                     }
                 } catch { }
             }
             if (matched.Count == 0) return 0;
-            // Ordenado para a escolha ser sempre a mesma: antes vinha de um
-            // HashSet, cuja ordem muda entre execuções, então o processo
-            // escolhido variava sem nada ter mudado.
-            matched.Sort();
 
             var withAudio = PidsWithAudioSessions();
             var parents = ParentMap();
@@ -393,7 +348,7 @@ namespace GreenLabsAudio {
             foreach (var pid in matched) {
                 if (withAudio.Contains(pid)) { seed = pid; break; }
             }
-            if (seed == 0) seed = matched[0];
+            if (seed == 0) seed = matched.First();
 
             uint root = seed;
             var guard = new HashSet<uint>();

@@ -20,7 +20,11 @@ export function hasAndroidScreenCapture() {
 // por isso, e não por limitação do protocolo.
 export const ANDROID_MAX_WIDTH = 1280;
 export const ANDROID_MAX_HEIGHT = 720;
-export const ANDROID_MAX_FPS = 15;
+// 30fps é experimental: dobra o número de frames a codificar em JPEG por
+// software, então gasta mais CPU e bateria que os 15fps de antes. Em aparelho
+// fraco pode engasgar - se acontecer, é só escolher uma qualidade menor, que o
+// fps acompanha.
+export const ANDROID_MAX_FPS = 30;
 
 /**
  * Pede a permissão de captura, conecta no stream nativo e devolve uma

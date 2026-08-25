@@ -3,7 +3,30 @@
 Todas as mudanças notáveis do app desktop, por versão. Formato livre, em
 português, ligado aos [releases do GitHub](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases).
 
-## [0.2.8](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.2.8) — 2026-08-25
+## [0.2.9](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.2.9) — 2026-08-25
+
+**Volta o subsistema de áudio para exatamente o da 0.2.5.** As versões 0.2.7 e
+0.2.8 travavam o PC, paravam o áudio do resto do sistema e no fim derrubavam o
+app. Ambas foram removidas do GitHub.
+
+A causa foi uma "correção" que eu introduzi na 0.2.7. Para impedir que o
+capturador excluísse a si mesmo, ele passou a montar a árvore do próprio
+processo e ignorá-la. Só que essa árvore subia até o topo — chegando no
+`explorer.exe` — e depois descia pegando todos os filhos. Como quase tudo que
+a pessoa abre é filho do Explorer, **o Discord acabava dentro da "própria
+árvore"** e nunca era excluído. Junto disso, cada conexão ao áudio passou a
+disparar duas consultas WMI e um reinício do processo de captura, o que
+explica a lentidão e o travamento.
+
+O arquivo de captura, o processo principal e o cliente voltaram byte a byte ao
+estado da 0.2.5. Verificado depois de recompilar: volta a encontrar o Discord
+e a excluir a árvore certa.
+
+As correções da 0.2.7 que dependiam desse caminho foram desfeitas junto —
+prefiro reintroduzir uma de cada vez, testando, do que manter algo que trava a
+máquina.
+
+## [0.2.8](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.2.8) — removida
 
 **Reverte a mudança da 0.2.7 que quebrou o compartilhamento de tela.** Aquela
 versão trocou o `audio: 'loopback'` do handler de captura do Electron por um
