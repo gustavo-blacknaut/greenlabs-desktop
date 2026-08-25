@@ -469,11 +469,6 @@ LAN, use Radmin VPN ou um túnel em vez do IP local.
 
 O que mudou em cada versão está no [CHANGELOG.md](CHANGELOG.md).
 
-## Créditos
-
-Projeto pessoal desenvolvido com auxílio do **Claude Code** (Anthropic),
-usado para pesquisa das APIs de áudio do Windows, depuração da interoperabilidade
-COM e implementação da interface.
 
 A captura de áudio por processo tomou como referência o
 [win-capture-audio](https://github.com/bozbez/win-capture-audio) e o
