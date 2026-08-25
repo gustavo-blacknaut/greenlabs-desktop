@@ -13,32 +13,10 @@ if (!gotTheLock) {
 
 app.setName('GreenLabs');
 
-// Preferências que precisam ser lidas antes do app ficar pronto ficam num JSON
-// simples ao lado dos dados do usuário - o localStorage do renderer só existe
-// depois da janela abrir, tarde demais para decidir sobre a GPU.
-const arquivoPrefs = path.join(app.getPath('userData'), 'preferencias.json');
-
-function lerPreferencias() {
-  try {
-    return JSON.parse(fs.readFileSync(arquivoPrefs, 'utf8'));
-  } catch {
-    return {};
-  }
-}
-
-function lerPreferencia(chave, padrao) {
-  const p = lerPreferencias();
-  return chave in p ? p[chave] : padrao;
-}
-
-function gravarPreferencia(chave, valor) {
-  const p = lerPreferencias();
-  p[chave] = valor;
-  try {
-    fs.mkdirSync(path.dirname(arquivoPrefs), { recursive: true });
-    fs.writeFileSync(arquivoPrefs, JSON.stringify(p, null, 2));
-  } catch {}
-}
+// Versao vinda do package.json, para a barra de titulo nao precisar repetir o
+// numero num lugar que envelhece sozinho. Fica fora de createWindow porque
+// ipcMain.handle registrado duas vezes lanca excecao.
+ipcMain.handle('greenlabs:get-version', () => app.getVersion());
 
 let mainWin = null;
 let tray = null;
@@ -293,22 +271,10 @@ function createWindow() {
     updateTrayMenu();
   });
 
-  // Só grava: a decisão sobre a GPU é tomada na inicialização, antes do app
-  // ficar pronto. Antes isso chamava disableHardwareAcceleration() aqui, o que
-  // o Electron simplesmente ignora nesse ponto - o botão não fazia nada.
-  ipcMain.handle('greenlabs:toggle-hardware-acceleration', (_e, enable) => {
-    gravarPreferencia('desligarAceleracao', !enable);
-    return { ok: true, reiniciarParaAplicar: true };
-  });
-
-  ipcMain.handle('greenlabs:get-hardware-acceleration', () =>
-    !lerPreferencia('desligarAceleracao', false)
-  );
-
-  ipcMain.on('greenlabs:restart-app', () => {
-    app.isQuitting = true;
-    app.relaunch();
-    app.exit(0);
+  ipcMain.on('greenlabs:toggle-hardware-acceleration', (_e, enable) => {
+    if (!enable) {
+      try { app.disableHardwareAcceleration(); } catch {}
+    }
   });
 
   ipcMain.on('greenlabs:window-minimize', () => {
@@ -413,17 +379,7 @@ app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('enable-zero-copy');
-// Mantido como na 0.2.5. Vale saber o que faz: manda o Chromium acelerar vídeo
-// mesmo em drivers que ele lista como problemáticos. Em algumas máquinas isso
-// congela o app ao exibir uma transmissão - quem estiver nessa situação
-// desliga a aceleração pelas configurações, que agora funciona de verdade.
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
-
-// Precisa acontecer antes do app ficar pronto - depois disso a chamada é
-// ignorada, que era o motivo do botão de desligar aceleração não fazer nada.
-if (lerPreferencia('desligarAceleracao', false)) {
-  try { app.disableHardwareAcceleration(); } catch {}
-}
 
 app.on('second-instance', () => {
   if (mainWin) {
@@ -445,6 +401,7 @@ const hostState = {
   addresses: [],
 };
 let signalingInstance = null;
+let signalingProc = null;
 let tunnelProc = null;
 
 // cloudflared é um único executável. Baixar sob demanda evita exigir winget ou
@@ -540,17 +497,84 @@ async function loadServerModule(name) {
   return import(url);
 }
 
+// Caminho do servidor de sinalização compilado. Fica em asarUnpack, e o
+// Electron redireciona sozinho de app.asar para app.asar.unpacked.
+function signalingBinPath() {
+  const nome = process.platform === 'win32' ? 'greenlabs-signaling.exe' : 'greenlabs-signaling';
+  return path.join(__dirname, nome);
+}
+
+function startSignalingProcess(porta) {
+  return new Promise((resolve, reject) => {
+    const exePath = signalingBinPath();
+    if (!fs.existsSync(exePath)) {
+      reject(new Error('binario nao encontrado'));
+      return;
+    }
+
+    const proc = require('node:child_process').spawn(exePath, ['--port', String(porta)], {
+      windowsHide: true,
+    });
+
+    // Só resolve quando o servidor confirma que abriu a porta. Sem isso o app
+    // anunciaria os endereços antes de existir alguém escutando neles.
+    let resolvido = false;
+    const prazo = setTimeout(() => encerrar(new Error('nao respondeu em 8s')), 8000);
+    function encerrar(err) {
+      if (resolvido) return;
+      resolvido = true;
+      clearTimeout(prazo);
+      try { proc.kill(); } catch {}
+      reject(err);
+    }
+
+    proc.stdout.on('data', (bloco) => {
+      const texto = bloco.toString();
+      process.stdout.write('[host] ' + texto);
+      if (!resolvido && texto.includes('rodando em')) {
+        resolvido = true;
+        clearTimeout(prazo);
+        resolve(proc);
+      }
+    });
+    proc.stderr.on('data', (bloco) => process.stdout.write('[host!] ' + bloco.toString()));
+    proc.on('error', encerrar);
+    proc.on('exit', (codigo) => {
+      encerrar(new Error('encerrou com codigo ' + codigo));
+      if (signalingProc === proc) {
+        // Morreu sozinho depois de estar no ar: a interface precisa saber, em
+        // vez de continuar mostrando um endereço que não atende mais.
+        signalingProc = null;
+        hostState.running = false;
+        hostState.addresses = [];
+        hostState.tunnelUrl = null;
+        pushHostState();
+      }
+    });
+  });
+}
+
 async function startHost({ port, tunnel }) {
   if (hostState.running) return hostState;
 
-  const { startSignaling } = await loadServerModule('signaling.js');
   const { localAddresses, resolveProvider, startTunnel } = await loadServerModule('tunnel.js');
 
   const chosenPort = Number(port) || 25640;
-  signalingInstance = await startSignaling({
-    port: chosenPort,
-    log: (msg) => console.log('[host]', msg),
-  });
+
+  // Preferência é o servidor em Go, num processo separado: hospedar deixa de
+  // dividir o event loop com a captura e a interface, então uma sala cheia não
+  // engasga a janela. O servidor em Node fica como reserva para quando o
+  // binário não estiver junto (build de outra plataforma, por exemplo).
+  try {
+    signalingProc = await startSignalingProcess(chosenPort);
+  } catch (err) {
+    console.log('[host] servidor em Go indisponivel (' + err.message + '), usando o de Node');
+    const { startSignaling } = await loadServerModule('signaling.js');
+    signalingInstance = await startSignaling({
+      port: chosenPort,
+      log: (msg) => console.log('[host]', msg),
+    });
+  }
 
   hostState.running = true;
   hostState.port = chosenPort;
@@ -600,6 +624,11 @@ async function startHost({ port, tunnel }) {
 async function stopHost() {
   try { tunnelProc?.kill(); } catch {}
   tunnelProc = null;
+  if (signalingProc) {
+    const proc = signalingProc;
+    signalingProc = null;
+    try { proc.kill(); } catch {}
+  }
   if (signalingInstance) {
     try { await signalingInstance.close(); } catch {}
     signalingInstance = null;
@@ -624,24 +653,11 @@ function startWasapiServer() {
   const captureExcludes = activeExcludedApps.filter((n) => n.includes('discord'));
   const excludeArg = (captureExcludes.length ? captureExcludes : ['discord']).join(',');
   const args = ['--port=25641', '--exclude=' + excludeArg];
-
-  const subir = () => {
-    wasapiProc = execFile(exePath, args, () => {});
-    try {
-      wasapiProc.stdout.on('data', (d) => process.stdout.write('[audio] ' + d));
-      wasapiProc.stderr.on('data', (d) => process.stdout.write('[audio!] ' + d));
-    } catch {}
-  };
-
-  // Um capturador de uma execução anterior segura a porta 25641, e o novo
-  // morria ao tentar abri-la. Só existe um app por vez (single instance), então
-  // qualquer capturador vivo aqui é sobra e pode sair. O pequeno atraso dá
-  // tempo do http.sys liberar o registro da porta.
+  wasapiProc = execFile(exePath, args, () => {});
   try {
-    exec('taskkill /F /IM AudioCapture.exe', () => setTimeout(subir, 400));
-  } catch {
-    subir();
-  }
+    wasapiProc.stdout.on('data', (d) => process.stdout.write('[audio] ' + d));
+    wasapiProc.stderr.on('data', (d) => process.stdout.write('[audio!] ' + d));
+  } catch {}
 }
 
 app.whenReady().then(() => {
@@ -675,11 +691,7 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
   try { tunnelProc?.kill(); } catch {}
-  // O capturador precisa morrer junto: sobrando vivo, ele segura a porta 25641
-  // e a próxima execução não consegue abri-la. kill() sozinho nem sempre dá
-  // conta no Windows, então o taskkill garante.
-  try { wasapiProc?.kill(); } catch {}
-  try { exec('taskkill /F /IM AudioCapture.exe'); } catch {}
+  try { signalingProc?.kill(); } catch {}
 });
 
 app.on('window-all-closed', () => {

@@ -1311,6 +1311,17 @@ h2 {
   color: var(--muted);
 }
 
+/* Versao ao lado da marca: menor e mais apagada, para identificar o build
+   sem competir com o nome. */
+.titlebar-version {
+  margin-left: 6px;
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  opacity: 0.6;
+}
+
 .titlebar-controls {
   display: flex;
   -webkit-app-region: no-drag;
@@ -1914,7 +1925,8 @@ h2 {
 }
 
 @media (max-width: 720px) {
-  .titlebar-brand {
+  .titlebar-brand,
+  .titlebar-version {
     display: none;
   }
 
@@ -2418,19 +2430,4 @@ h2 {
 
 .tunnel-providers {
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-}
-
-.restart-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--green-line);
-  border-radius: 11px;
-  background: var(--green-soft);
-  color: var(--green);
-  font-size: 0.8rem;
-  font-weight: 600;
 }

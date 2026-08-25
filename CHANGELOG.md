@@ -3,6 +3,65 @@
 Todas as mudanças notáveis do app desktop, por versão. Formato livre, em
 português, ligado aos [releases do GitHub](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases).
 
+## [0.3.3](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.3.3) — 2026-08-25
+
+**O servidor de sinalização agora vai compilado dentro do app.** Quando você
+hospeda pelo GreenLabs, quem atende é o
+[servidor em Go](https://github.com/gustavo-blacknaut/greenlabs-live-streaming-server-go),
+um executável de 7 MB que vem junto na instalação. Não precisa instalar Go, nem
+Node, nem contratar hospedagem — é só clicar em hospedar.
+
+A diferença que importa não é velocidade, é onde ele roda. Antes a sinalização
+rodava **dentro do processo principal do Electron**, dividindo o mesmo event
+loop com a janela, a captura e o áudio. Uma sala cheia disputava tempo com a
+interface. Agora é um processo separado: se a sinalização ficar ocupada, a
+janela não sente.
+
+Medido com os dois servidores no ar ao mesmo tempo, 100 clientes numa sala a
+300 mensagens por segundo cada: o Go gastou 1,6 s de CPU contra 10,4 s do Node,
+e 24 MB de RAM contra 160 MB. Parado, 8 MB contra 47 MB.
+
+Detalhes:
+
+- O app só anuncia os endereços depois que o servidor confirma que abriu a
+  porta. Antes ele mostrava o endereço na hora, mesmo que ninguém estivesse
+  atendendo ainda.
+
+- Porta ocupada agora falha na hora, com mensagem, em vez de ficar pendurada.
+
+- Se o servidor morrer sozinho depois de estar no ar, a interface volta a
+  mostrar "parado" em vez de manter um endereço que não responde mais.
+
+- O processo é encerrado junto com o app, e o servidor em Node continua como
+  reserva caso o binário não esteja junto.
+
+## [0.3.2](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.3.2) — 2026-08-25
+
+A 0.3.0 travava assim que a tela era aberta. Como não deu para reproduzir o
+crash aqui, o caminho foi outro: em vez de continuar chutando, os arquivos que
+mexem com janela, captura e interface voltaram byte a byte para a 0.2.5.
+
+O que sobrou de diferente da 0.2.5 é só isto:
+
+- **`AudioCapture.exe` não estoura mais quando a porta local está ocupada.**
+  Se um capturador de uma execução anterior ainda segura a `127.0.0.1:25641`,
+  ele tenta abrir cinco vezes, com espera crescente, e desiste com um aviso no
+  log em vez de morrer com exceção não tratada. Cada tentativa usa um
+  `HttpListener` novo, porque um `Start()` que falha descarta o objeto.
+
+- **Android sobe para 30fps.** O limite do lado do desktop era 15.
+
+- **A versão aparece na barra de título,** ao lado de "GreenLabs". Ela vem do
+  `package.json` pelo processo principal, então não tem número escrito à mão
+  para envelhecer sozinho.
+
+O que **não** mudou em relação à 0.2.5: o `setDisplayMediaRequestHandler`, as
+sete flags de GPU e a duplicação de área de trabalho (DXGI). Isso continua
+intocado.
+
+A 0.3.1 tinha as duas primeiras correções, mas ficou só como build local — não
+chegou a ser publicada.
+
 ## [0.3.0](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.3.0) — 2026-08-25
 
 Parte da 0.2.5, que é a versão que funcionava, e corrige dois defeitos que

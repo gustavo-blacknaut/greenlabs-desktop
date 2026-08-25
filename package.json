@@ -1,7 +1,7 @@
 {
   "name": "greenlabs",
   "productName": "GreenLabs",
-  "version": "0.3.0",
+  "version": "0.3.3",
   "description": "GreenLabs Live Streaming Engine",
   "author": "GreenLabs",
   "private": true,
@@ -69,6 +69,7 @@
     "asarUnpack": [
       "server/**/*",
       "electron/AudioCapture.exe",
+      "electron/greenlabs-signaling.exe",
       "node_modules/ws/**/*"
     ]
   },

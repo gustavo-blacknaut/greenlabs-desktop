@@ -13,19 +13,18 @@ contextBridge.exposeInMainWorld('greenlabsPicker', {
 });
 
 contextBridge.exposeInMainWorld('greenlabsAudio', {
-  setAudioExclusion: (apps) => ipcRenderer.invoke('greenlabs:set-audio-exclusion', apps),
-  getAudioExclusion: () => ipcRenderer.invoke('greenlabs:get-audio-exclusion'),
+  startExclusion: (apps) => ipcRenderer.send('greenlabs:start-audio-exclusion', apps),
+  stopExclusion: () => ipcRenderer.send('greenlabs:stop-audio-exclusion'),
 });
 
 contextBridge.exposeInMainWorld('greenlabsApp', {
   hideToTray: () => ipcRenderer.send('greenlabs:hide-to-tray'),
   toggleAutoLaunch: (enable) => ipcRenderer.send('greenlabs:toggle-autolaunch', enable),
-  toggleHardwareAcceleration: (enable) => ipcRenderer.invoke('greenlabs:toggle-hardware-acceleration', enable),
-  getHardwareAcceleration: () => ipcRenderer.invoke('greenlabs:get-hardware-acceleration'),
-  restartApp: () => ipcRenderer.send('greenlabs:restart-app'),
+  toggleHardwareAcceleration: (enable) => ipcRenderer.send('greenlabs:toggle-hardware-acceleration', enable),
   getRunningProcesses: () => ipcRenderer.invoke('greenlabs:get-running-processes'),
   toggleFullscreen: () => ipcRenderer.send('greenlabs:toggle-fullscreen'),
   getWasapiAudioUrl: () => 'http://127.0.0.1:25641/audio/',
+  getVersion: () => ipcRenderer.invoke('greenlabs:get-version'),
   minimizeWindow: () => ipcRenderer.send('greenlabs:window-minimize'),
   toggleMaximizeWindow: () => ipcRenderer.send('greenlabs:window-maximize-toggle'),
   closeWindow: () => ipcRenderer.send('greenlabs:window-close'),
