@@ -163,9 +163,19 @@ política da plataforma, não dá para remover.
 Abra **Configuração → Hospedar**, escolha a porta, marque **Abrir túnel** se
 quiser acesso pela internet, e clique em **Iniciar servidor**.
 
-O servidor roda dentro do próprio GreenLabs — não precisa de terminal nem de
-Node instalado. A aba lista os endereços prontos para compartilhar, com botão de
-copiar, e um botão **Usar** para você mesmo entrar no seu servidor.
+O servidor roda dentro do próprio GreenLabs — não precisa de terminal, nem de
+Node, nem de Go instalado. Quem atende é o
+[servidor em Go](https://github.com/gustavo-blacknaut/greenlabs-live-streaming-server-go),
+um executável de 7 MB que vem junto na instalação, em processo separado do app.
+
+Ficar fora do processo do Electron é o que importa aqui: antes a sinalização
+dividia o mesmo event loop com a janela, a captura e o áudio, e uma sala cheia
+disputava tempo com a interface. Medido lado a lado com o servidor antigo em
+Node, 100 clientes a 300 mensagens por segundo cada: **1,6 s de CPU contra
+10,4 s, e 24 MB de RAM contra 160 MB**.
+
+A aba lista os endereços prontos para compartilhar, com botão de copiar, e um
+botão **Usar** para você mesmo entrar no seu servidor.
 
 Endereços marcados com **VPN** são de Radmin VPN ou Hamachi. Se o túnel estiver
 ativo, o endereço público (`wss://...`) aparece destacado no topo.
