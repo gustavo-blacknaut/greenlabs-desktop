@@ -14,6 +14,9 @@ import { normalizeServer, cleanDomainOnly, formatUserList } from './lib/format.j
 import { startWasapiAudioTrack } from './lib/wasapi-audio.js';
 import { hasAndroidScreenCapture, startAndroidScreenCapture } from './lib/android-screen.js';
 
+// A árvore do Discord é o alvo padrão da exclusão - é o motivo do app existir.
+const PADRAO_EXCLUSAO = 'discord, discordptb, discordcanary, discorddevelopment';
+
 // The BrowserWindow is frameless, so the drag region and window buttons live here.
 function CameraPreview({ deviceId }) {
   const ref = useRef(null);
@@ -288,11 +291,8 @@ function App() {
   const [shareAudioEnabled, setShareAudioEnabled] = useState(() => {
     try { return localStorage.getItem('greenlabs:shareAudio') !== '0'; } catch { return true; }
   });
-  const [audioFilterMode, setAudioFilterMode] = useState(() => {
-    try { return localStorage.getItem('greenlabs:audioFilterMode') || 'blacklist'; } catch { return 'blacklist'; }
-  });
   const [excludedAudioApps, setExcludedAudioApps] = useState(() => {
-    try { return localStorage.getItem('greenlabs:excludedAudioApps') || 'discord, discordptb, discordcanary, discorddevelopment, electron, greenlabs'; } catch { return 'discord, discordptb, discordcanary, discorddevelopment, electron, greenlabs'; }
+    try { return localStorage.getItem('greenlabs:excludedAudioApps') || PADRAO_EXCLUSAO; } catch { return PADRAO_EXCLUSAO; }
   });
   const [runningProcesses, setRunningProcesses] = useState([]);
   const [connected, setConnected] = useState(false);
@@ -496,8 +496,19 @@ function App() {
     window.greenlabsApp?.getTunnelProviders?.().then(setTunnelProviders).catch(() => {});
   }, [configTab]);
   useEffect(() => { try { localStorage.setItem('greenlabs:shareAudio', shareAudioEnabled ? '1' : '0'); } catch {} }, [shareAudioEnabled]);
-  useEffect(() => { try { localStorage.setItem('greenlabs:audioFilterMode', audioFilterMode); } catch {} }, [audioFilterMode]);
   useEffect(() => { try { localStorage.setItem('greenlabs:excludedAudioApps', excludedAudioApps); } catch {} }, [excludedAudioApps]);
+
+  // A lista precisa chegar no AudioCapture.exe, não só no localStorage: ele lê
+  // a exclusão uma vez, ao subir, então mudar aqui exige reiniciá-lo. Sem isso
+  // esta tela era só decoração - gravava a escolha e o capturador seguia com a
+  // lista de fábrica.
+  useEffect(() => {
+    const api = window.greenlabsApp;
+    if (!api?.setAudioExclusion) return undefined;
+    // Espera a digitação parar antes de reiniciar a captura.
+    const t = setTimeout(() => { api.setAudioExclusion(excludedAudioApps); }, 600);
+    return () => clearTimeout(t);
+  }, [excludedAudioApps]);
 
   const send = (payload) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(JSON.stringify(payload));
@@ -754,7 +765,7 @@ function App() {
       });
 
       const videoTrack = rawStream.getVideoTracks()[0];
-      let finalStream = new MediaStream([videoTrack]);
+      const finalStream = new MediaStream([videoTrack]);
       const count = localStreamsRef.current.filter((i) => i.kind === 'screen').length + 1;
       addLocalStream('screen', `Tela ${count} - ${quality.label}`, finalStream, quality);
       setShowLiveBanner(true);
@@ -768,20 +779,17 @@ function App() {
           const { audioTrack, cleanup } = await startWasapiAudioTrack();
           if (!audioTrack) return;
 
-          finalStream = new MediaStream([videoTrack, audioTrack]);
-
-          localStreamsRef.current = localStreamsRef.current.map((item) =>
-            item.kind === 'screen' && item.stream.getVideoTracks()[0] === videoTrack ? { ...item, stream: finalStream } : item
-          );
-          setStreams((current) => current.map((item) =>
-            item.kind === 'screen' && item.stream.getVideoTracks()[0] === videoTrack ? { ...item, stream: finalStream } : item
-          ));
+          // O áudio entra na MESMA MediaStream que já foi publicada, em vez de
+          // uma nova. Criando outra, o id mudava, o ontrack do outro lado via
+          // um stream desconhecido e abria um segundo card - sem vídeo, então
+          // rotulado como câmera. Mantendo o id, a faixa se junta à tela.
+          finalStream.addTrack(audioTrack);
 
           for (const [peerId, pc] of peersRef.current.entries()) {
             pc.addTrack(audioTrack, finalStream);
-            // addTrack alone doesn't tell the remote side anything - without a
-            // renegotiated offer the peer's ontrack never fires and the audio
-            // just never arrives, even though it's really being sent.
+            // addTrack sozinho não avisa o outro lado - sem uma nova oferta o
+            // ontrack de lá nunca dispara e o áudio não chega, mesmo estando
+            // sendo enviado de verdade.
             makeOffer(peerId).catch(() => {});
           }
 
@@ -910,6 +918,15 @@ function App() {
       setRoomId('call1');
       setDefaultServerUrl('ws://localhost:25640');
       setDefaultRoom('call1');
+
+      // O botão só mexia no servidor e na sala, então quem tinha bagunçado a
+      // exclusão de áudio continuava com ela bagunçada depois de restaurar.
+      setExcludedAudioApps(PADRAO_EXCLUSAO);
+      setShareAudioEnabled(true);
+      setGridSlots(1);
+      setScreenQualityId('1080p30');
+      window.greenlabsApp?.setAudioExclusion?.(PADRAO_EXCLUSAO);
+      setShareError('Configurações restauradas.');
     } catch {}
   };
 
@@ -1151,12 +1168,9 @@ function App() {
                   </div>
                   <hr className="divider" />
 
-                  <label>Modo de Filtro de Som da Transmissão
-                    <select className="styled-select" value={audioFilterMode} onChange={(e) => setAudioFilterMode(e.target.value)}>
-                      <option value="blacklist">Blacklist (Silenciar apenas os programas selecionados abaixo)</option>
-                      <option value="whitelist">Whitelist (Silenciar TUDO no PC, EXCETO a janela/jogo autorizada)</option>
-                    </select>
-                  </label>
+                  <div className="block-title">
+                    <MonitorIcon size={14} /> <span>Som que não entra na transmissão</span>
+                  </div>
 
                   {runningProcesses.length > 0 && (
                     <div className="process-selector-wrap">
@@ -1180,17 +1194,18 @@ function App() {
                     </div>
                   )}
 
-                  <label>{audioFilterMode === 'whitelist' ? 'Transmitir APENAS o som destes programas (Whitelist)' : 'Excluir som destes programas (Blacklist)'}
+                  <label>Programas
                     <input
                       value={excludedAudioApps}
                       onChange={(e) => setExcludedAudioApps(e.target.value)}
-                      placeholder={audioFilterMode === 'whitelist' ? 'ex: chrome, vlc, game' : 'ex: discord, spotify, chrome'}
+                      placeholder="ex: discord"
                     />
                   </label>
                   <p className="hint">
-                    {audioFilterMode === 'whitelist'
-                      ? 'Modo Whitelist: Muta 100% dos sons do Windows (incluindo chamadas do Discord), deixando sair APENAS o som dos programas listados acima!'
-                      : 'Modo Blacklist: O som dos programas listados acima não sairá na sua transmissão de tela.'}
+                    O som destes programas fica fora da transmissão, mas continua
+                    tocando normalmente no seu PC — ninguém é mutado. A captura
+                    exclui uma árvore de processos por vez, então na prática vale
+                    listar só o principal (o Discord e suas variações, por padrão).
                   </p>
                   <hr className="divider" />
                   <label className="check-row" onClick={() => {

@@ -16,7 +16,10 @@ app.setName('GreenLabs');
 let mainWin = null;
 let tray = null;
 let pickerResolve = null;
-let activeExcludedApps = ['discord', 'discordptb', 'discordcanary', 'discorddevelopment', 'electron', 'greenlabs'];
+// Só a família do Discord: o modo EXCLUDE leva uma árvore por vez, e listar
+// o próprio app faria o capturador excluir a si mesmo (o AudioCapture.cs
+// também se protege disso, mas não custa não pedir).
+let activeExcludedApps = ['discord', 'discordptb', 'discordcanary', 'discorddevelopment'];
 
 app.isQuitting = false;
 
@@ -77,35 +80,11 @@ function updateTrayMenu() {
   tray.setContextMenu(contextMenu);
 }
 
-let activeAudioMode = 'blacklist';
-
-function manageCustomAudioSessions(mute, rawOptions) {
-  if (process.platform !== 'win32') return;
-  const scriptPath = path.join(__dirname, 'mute-audio.ps1');
-  if (!fs.existsSync(scriptPath)) return;
-
-  // Only refresh targets when starting: stopping must unmute the same set.
-  if (mute && rawOptions && typeof rawOptions === 'object' && !Array.isArray(rawOptions)) {
-    if (rawOptions.mode) activeAudioMode = rawOptions.mode;
-    const appsRaw = rawOptions.apps;
-    if (typeof appsRaw === 'string') {
-      const parsed = appsRaw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
-      if (parsed.length) activeExcludedApps = parsed;
-    } else if (Array.isArray(appsRaw) && appsRaw.length) {
-      activeExcludedApps = appsRaw;
-    }
-  }
-
-  // No spaces/quotes around the comma list: passed as one token, and
-  // mute-audio.ps1 splits it itself (see its own -join/-split normalization).
-  const keywordsArg = activeExcludedApps.join(',');
-  const cmd = `powershell -ExecutionPolicy Bypass -File "${scriptPath}" -MuteStr ${mute ? 'true' : 'false'} -FilterMode ${activeAudioMode} -Keywords ${keywordsArg}`;
-  exec(cmd, (err, stdout, stderr) => {
-    const logPath = path.join(__dirname, 'mute-audio-debug.log');
-    const entry = `\n[${new Date().toISOString()}]\n${stdout || ''}${stderr ? '\nSTDERR: ' + stderr : ''}${err ? '\nERROR: ' + err.message : ''}\n`;
-    try { fs.appendFileSync(logPath, entry); } catch {}
-  });
-}
+// O sistema antigo mutava os aplicativos no mixer do Windows. Foi removido:
+// mutar o Discord tirava o som para a propria pessoa, que era justamente o
+// contrario do objetivo. A exclusao real acontece no AudioCapture.exe, que
+// captura por processo em modo exclude - o Discord continua tocando normal
+// no PC e so nao entra na transmissao.
 
 function getRunningProcessesList() {
   return new Promise((resolve) => {
@@ -236,7 +215,11 @@ function createWindow() {
         callback({});
         return;
       }
-      callback({ video: chosen, audio: 'loopback' });
+      // Sem áudio aqui, de propósito: 'loopback' entrega o som do sistema
+      // inteiro, Discord incluído - exatamente o que este app existe para
+      // evitar. O áudio da transmissão vem do AudioCapture.exe, que captura
+      // por processo em modo exclude.
+      callback({ video: chosen, audio: undefined });
     } catch {
       callback({});
     }
@@ -249,13 +232,16 @@ function createWindow() {
     if (pickerResolve) pickerResolve(null);
   });
 
-  ipcMain.on('greenlabs:start-audio-exclusion', (_e, apps) => {
-    manageCustomAudioSessions(true, apps);
+  // Aplica a lista da tela de configuração no capturador de verdade.
+  ipcMain.handle('greenlabs:set-audio-exclusion', (_e, apps) => {
+    try {
+      return { ok: true, apps: aplicarExclusaoDeAudio(apps) };
+    } catch (err) {
+      return { ok: false, error: String(err?.message || err) };
+    }
   });
 
-  ipcMain.on('greenlabs:stop-audio-exclusion', () => {
-    manageCustomAudioSessions(false, activeExcludedApps);
-  });
+  ipcMain.handle('greenlabs:get-audio-exclusion', () => activeExcludedApps);
 
   ipcMain.handle('greenlabs:get-running-processes', async () => {
     return await getRunningProcessesList();
@@ -566,20 +552,42 @@ async function stopHost() {
 
 let wasapiProc = null;
 
+function stopWasapiServer() {
+  if (!wasapiProc) return;
+  try { wasapiProc.kill(); } catch {}
+  wasapiProc = null;
+}
+
 function startWasapiServer() {
   if (process.platform !== 'win32') return;
   const exePath = path.join(__dirname, 'AudioCapture.exe');
   if (!fs.existsSync(exePath)) return;
-  // Only the Discord family: EXCLUDE takes one process tree, and listing this
-  // app too would exclude it instead of Discord.
-  const captureExcludes = activeExcludedApps.filter((n) => n.includes('discord'));
-  const excludeArg = (captureExcludes.length ? captureExcludes : ['discord']).join(',');
+  stopWasapiServer();
+
+  // O modo EXCLUDE do WASAPI recebe uma árvore de processos por vez, então a
+  // lista aqui vira o alvo da exclusão. Se a pessoa esvaziar tudo, cai no
+  // Discord - que é o motivo de o app existir.
+  const excludeArg = (activeExcludedApps.length ? activeExcludedApps : ['discord']).join(',');
   const args = ['--port=25641', '--exclude=' + excludeArg];
   wasapiProc = execFile(exePath, args, () => {});
   try {
     wasapiProc.stdout.on('data', (d) => process.stdout.write('[audio] ' + d));
     wasapiProc.stderr.on('data', (d) => process.stdout.write('[audio!] ' + d));
   } catch {}
+}
+
+/**
+ * Reconfigura a exclusão de áudio. O AudioCapture.exe lê a lista uma vez, no
+ * início, então mudar de ideia exige subir de novo - antes disso a tela de
+ * configuração só gravava a lista e o capturador seguia com a de fábrica.
+ */
+function aplicarExclusaoDeAudio(apps) {
+  const lista = (Array.isArray(apps) ? apps : String(apps || '').split(','))
+    .map((s) => String(s).trim().toLowerCase())
+    .filter(Boolean);
+  activeExcludedApps = lista.length ? lista : ['discord'];
+  startWasapiServer();
+  return activeExcludedApps;
 }
 
 app.whenReady().then(() => {
@@ -618,6 +626,6 @@ app.on('before-quit', () => {
 app.on('window-all-closed', () => {
   try { wasapiProc?.kill(); } catch {}
   // Don't leave Discord muted if the app closes mid-share.
-  try { manageCustomAudioSessions(false, activeExcludedApps); } catch {}
+
   if (process.platform !== 'darwin' && app.isQuitting) app.quit();
 });

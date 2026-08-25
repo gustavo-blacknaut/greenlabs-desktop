@@ -13,8 +13,8 @@ contextBridge.exposeInMainWorld('greenlabsPicker', {
 });
 
 contextBridge.exposeInMainWorld('greenlabsAudio', {
-  startExclusion: (apps) => ipcRenderer.send('greenlabs:start-audio-exclusion', apps),
-  stopExclusion: () => ipcRenderer.send('greenlabs:stop-audio-exclusion'),
+  setAudioExclusion: (apps) => ipcRenderer.invoke('greenlabs:set-audio-exclusion', apps),
+  getAudioExclusion: () => ipcRenderer.invoke('greenlabs:get-audio-exclusion'),
 });
 
 contextBridge.exposeInMainWorld('greenlabsApp', {

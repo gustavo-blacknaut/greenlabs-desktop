@@ -3,6 +3,39 @@
 Todas as mudanças notáveis do app desktop, por versão. Formato livre, em
 português, ligado aos [releases do GitHub](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases).
 
+## [0.2.7](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.2.7) — 2026-08-24
+
+Quatro defeitos no áudio, todos localizados no código antes de qualquer correção:
+
+- **O app podia excluir a si mesmo em vez do Discord.** O modo EXCLUDE do
+  WASAPI aceita uma árvore de processos por vez, e o alvo era escolhido a
+  partir de um `HashSet` — cuja ordem muda entre execuções. Com `electron` e
+  `greenlabs` na lista, o capturador às vezes elegia a própria árvore, e o som
+  do Discord passava direto. Agora a árvore do capturador nunca é candidata, e
+  a escolha é ordenada: mesma situação, mesmo resultado.
+- **O áudio virava um segundo card, rotulado como câmera.** Ao anexar a faixa
+  de áudio, o app criava uma `MediaStream` nova. Como o id mudava, o outro lado
+  via um stream desconhecido e abria outro card — sem vídeo, então classificado
+  como câmera. A faixa agora entra na mesma stream já publicada.
+- **O Electron entregava o som do sistema inteiro.** O handler de captura
+  concedia `audio: 'loopback'`, que inclui o Discord — exatamente o que este
+  app existe para evitar. O áudio da transmissão vem só do capturador por
+  processo.
+- **A tela de configuração de áudio não fazia nada.** A lista de programas era
+  gravada no navegador e nunca chegava ao capturador, que seguia com a lista de
+  fábrica. Agora mudar a lista reinicia a captura com ela.
+
+Também:
+
+- **Restaurar fábrica** só mexia no servidor e na sala. Agora repõe também a
+  exclusão de áudio, o compartilhamento de som, a divisão de tela e a
+  qualidade.
+- **Removido o sistema antigo de mute** (`mute-audio.ps1`), que silenciava os
+  aplicativos no mixer do Windows. Ele tirava o som do Discord da própria
+  pessoa — o oposto do objetivo — e continuava no código sem uso.
+- **Removida a opção "whitelist"** da configuração: ela prometia mutar o
+  Windows inteiro, comportamento do sistema que saiu.
+
 > **Nota sobre as versões 0.2.2 a 0.2.4:** algumas entradas descreviam
 > correções do app Android como se fossem deste repositório. O app Android tem
 > [repositório e versionamento próprios](https://github.com/gustavo-blacknaut/greenlabs-live-streaming-mobile);
