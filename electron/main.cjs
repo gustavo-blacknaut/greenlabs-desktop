@@ -215,11 +215,13 @@ function createWindow() {
         callback({});
         return;
       }
-      // Sem áudio aqui, de propósito: 'loopback' entrega o som do sistema
-      // inteiro, Discord incluído - exatamente o que este app existe para
-      // evitar. O áudio da transmissão vem do AudioCapture.exe, que captura
-      // por processo em modo exclude.
-      callback({ video: chosen, audio: undefined });
+      // NÃO MEXER: este callback precisa continuar entregando 'loopback'.
+      // Trocar por undefined, ou omitir a chave, quebrou o compartilhamento de
+      // tela na 0.2.7 (o app travava e não transmitia nada). O áudio que sai
+      // na transmissão não vem daqui - a faixa de loopback é descartada no
+      // renderer, que usa só o vídeo e anexa o áudio do AudioCapture.exe,
+      // capturado por processo em modo exclude.
+      callback({ video: chosen, audio: 'loopback' });
     } catch {
       callback({});
     }

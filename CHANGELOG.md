@@ -3,7 +3,22 @@
 Todas as mudanças notáveis do app desktop, por versão. Formato livre, em
 português, ligado aos [releases do GitHub](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases).
 
-## [0.2.7](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.2.7) — 2026-08-24
+## [0.2.8](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.2.8) — 2026-08-25
+
+**Reverte a mudança da 0.2.7 que quebrou o compartilhamento de tela.** Aquela
+versão trocou o `audio: 'loopback'` do handler de captura do Electron por um
+`undefined`, para não pedir o som do sistema. O efeito colateral foi o app
+travar e não transmitir nada — a 0.2.7 foi removida do GitHub.
+
+O `loopback` está de volta e não deve mais sair dali. Ele parece contraditório
+(é "todo o som do sistema, Discord incluído"), mas essa faixa **nunca é
+transmitida**: o app usa só o vídeo do `getDisplayMedia` e anexa por fora o
+áudio do `AudioCapture.exe`, que é o capturado por processo em modo exclude.
+Tirar o `loopback` não melhora nada e quebra a captura.
+
+As demais correções da 0.2.7 continuam valendo (a lista abaixo).
+
+## [0.2.7](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.2.7) — removida
 
 Quatro defeitos no áudio, todos localizados no código antes de qualquer correção:
 
