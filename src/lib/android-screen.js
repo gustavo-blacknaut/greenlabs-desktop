@@ -10,6 +10,22 @@
 // para virar uma MediaStream de verdade. A partir daí é o mesmo caminho que uma
 // câmera percorre, e o resto do WebRTC não precisa saber a diferença.
 
+// Só existe uma captura por vez: o Android entrega um MediaProjection só.
+// Guardar o encerramento num módulo evita ter que passar o objeto de volta por
+// toda a árvore de componentes.
+let pararCapturaNativa = null;
+
+/**
+ * Encerra a captura de tela do Android de verdade — a faixa do canvas e o
+ * MediaProjection do lado nativo. Seguro chamar sem nada capturando.
+ */
+export function stopAndroidScreenCapture() {
+  const parar = pararCapturaNativa;
+  pararCapturaNativa = null;
+  if (parar) parar();
+  else window.greenlabsMobile?.stopScreenCapture?.();
+}
+
 /** O app Android expõe window.greenlabsMobile; em qualquer outro lugar não existe. */
 export function hasAndroidScreenCapture() {
   return typeof window !== 'undefined' && !!window.greenlabsMobile?.isAvailable?.();
@@ -121,9 +137,23 @@ export async function startAndroidScreenCapture({ quality, onDropped }) {
     }
   })();
 
-  window.__glScreenStopped = () => {
+  // MediaStreamTrack.stop() NAO dispara 'ended' - por especificacao esse
+  // evento so ocorre quando a faixa termina por causa externa (o usuario
+  // parou pela notificacao do Android, o app foi para segundo plano). Entao
+  // quando alguem clicava no X para encerrar a transmissao, a faixa do canvas
+  // parava, o card sumia da tela... e o lado nativo continuava capturando, com
+  // a notificacao no topo e o MediaProjection vivo.
+  //
+  // Por isso o encerramento explicito e registrado aqui, para o botao de fechar
+  // conseguir avisar o Android de verdade.
+  pararCapturaNativa = () => {
+    if (stopped) return;
+    stopped = true;
+    try { reader.cancel(); } catch {}
     try { videoTrack.stop(); } catch {}
+    bridge.stopScreenCapture?.();
   };
+
   videoTrack.addEventListener('ended', () => {
     if (stopped) return;
     stopped = true;

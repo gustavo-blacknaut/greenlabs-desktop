@@ -12,7 +12,7 @@ import {
 } from './lib/media.js';
 import { normalizeServer, cleanDomainOnly, formatUserList } from './lib/format.js';
 import { startWasapiAudioTrack } from './lib/wasapi-audio.js';
-import { hasAndroidScreenCapture, startAndroidScreenCapture } from './lib/android-screen.js';
+import { hasAndroidScreenCapture, startAndroidScreenCapture, stopAndroidScreenCapture } from './lib/android-screen.js';
 
 // The BrowserWindow is frameless, so the drag region and window buttons live here.
 function CameraPreview({ deviceId }) {
@@ -703,6 +703,10 @@ function App() {
     for (const peerId of peersRef.current.keys()) {
       send({ type: 'stream-ended', to: peerId, id: item.id, streamId: item.stream.id });
     }
+    // Parar a faixa nao avisa o Android: track.stop() nao dispara 'ended'.
+    // Sem este aviso explicito a notificacao de gravacao continuava no topo e o
+    // MediaProjection seguia rodando depois de fechar a transmissao.
+    if (item.kind === 'screen' && hasAndroidScreenCapture()) stopAndroidScreenCapture();
     try { item.stream.getTracks().forEach((track) => { try { track.stop(); } catch {} }); } catch {}
     localStreamsRef.current = localStreamsRef.current.filter((s) => s.id !== id);
     setStreams((current) => {
