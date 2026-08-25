@@ -376,9 +376,36 @@ namespace GreenLabsAudio {
                 else if (a.StartsWith("--exclude=")) _excludeApps = a.Substring(10).Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
             }
 
-            var listener = new HttpListener();
-            listener.Prefixes.Add("http://127.0.0.1:" + port + "/audio/");
-            listener.Start();
+            // Start() lanca quando a porta ja esta tomada - tipicamente por uma
+            // instancia anterior que nao morreu junto com o app. Sem tratar, a
+            // excecao derrubava o processo inteiro com um erro do .NET, e o
+            // usuario via o app "fechar sozinho". Agora tenta algumas vezes,
+            // dando tempo do http.sys liberar o registro, e sai com codigo de
+            // erro em vez de estourar.
+            // Um Start() que falha deixa o HttpListener descartado, entao cada
+            // tentativa precisa de um objeto novo - reaproveitar o mesmo so
+            // rende "nao e possivel acessar um objeto descartado".
+            HttpListener listener = null;
+            bool ouvindo = false;
+            for (int tentativa = 1; tentativa <= 5 && !ouvindo; tentativa++) {
+                try {
+                    listener = new HttpListener();
+                    listener.Prefixes.Add("http://127.0.0.1:" + port + "/audio/");
+                    listener.Start();
+                    ouvindo = true;
+                } catch (HttpListenerException ex) {
+                    Log("[start] porta " + port + " ocupada (tentativa " + tentativa + "/5): " + ex.Message);
+                    try { if (listener != null) listener.Close(); } catch { }
+                    if (tentativa == 5) {
+                        Log("[start] desistindo: outra instancia do capturador ainda segura a porta.");
+                        return 1;
+                    }
+                    Thread.Sleep(400 * tentativa);
+                } catch (Exception ex) {
+                    Log("[start] falha inesperada: " + ex.Message);
+                    return 1;
+                }
+            }
             Log("Audio capture listening on " + port + " (excluding: " + string.Join(", ", _excludeApps) + ")");
 
             while (_running) {

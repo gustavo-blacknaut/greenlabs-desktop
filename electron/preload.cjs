@@ -20,7 +20,9 @@ contextBridge.exposeInMainWorld('greenlabsAudio', {
 contextBridge.exposeInMainWorld('greenlabsApp', {
   hideToTray: () => ipcRenderer.send('greenlabs:hide-to-tray'),
   toggleAutoLaunch: (enable) => ipcRenderer.send('greenlabs:toggle-autolaunch', enable),
-  toggleHardwareAcceleration: (enable) => ipcRenderer.send('greenlabs:toggle-hardware-acceleration', enable),
+  toggleHardwareAcceleration: (enable) => ipcRenderer.invoke('greenlabs:toggle-hardware-acceleration', enable),
+  getHardwareAcceleration: () => ipcRenderer.invoke('greenlabs:get-hardware-acceleration'),
+  restartApp: () => ipcRenderer.send('greenlabs:restart-app'),
   getRunningProcesses: () => ipcRenderer.invoke('greenlabs:get-running-processes'),
   toggleFullscreen: () => ipcRenderer.send('greenlabs:toggle-fullscreen'),
   getWasapiAudioUrl: () => 'http://127.0.0.1:25641/audio/',

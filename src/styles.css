@@ -2419,3 +2419,18 @@ h2 {
 .tunnel-providers {
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
+
+.restart-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--green-line);
+  border-radius: 11px;
+  background: var(--green-soft);
+  color: var(--green);
+  font-size: 0.8rem;
+  font-weight: 600;
+}

@@ -282,6 +282,7 @@ function App() {
     try { return localStorage.getItem('greenlabs:userName') || `Usuario ${Math.floor(Math.random() * 99) + 1}`; } catch { return `Usuario ${Math.floor(Math.random() * 99) + 1}`; }
   });
   const [screenQualityId, setScreenQualityId] = useState('1080p30');
+  const [precisaReiniciar, setPrecisaReiniciar] = useState(false);
   const [hwAccel, setHwAccel] = useState(() => {
     try { return localStorage.getItem('greenlabs:hwAccel') !== 'false'; } catch { return true; }
   });
@@ -480,6 +481,14 @@ function App() {
 
   useEffect(() => { try { localStorage.setItem('greenlabs:servers', JSON.stringify(servers)); } catch {} }, [servers]);
   useEffect(() => { try { localStorage.setItem('greenlabs:hwAccel', String(hwAccel)); } catch {} }, [hwAccel]);
+
+  // O processo principal e quem manda: o valor fica num arquivo lido antes da
+  // janela abrir, entao o localStorage aqui pode estar desatualizado.
+  useEffect(() => {
+    window.greenlabsApp?.getHardwareAcceleration?.().then((v) => {
+      if (typeof v === 'boolean') setHwAccel(v);
+    }).catch(() => {});
+  }, []);
   useEffect(() => { try { localStorage.setItem('greenlabs:gridSlots', String(gridSlots)); } catch {} }, [gridSlots]);
   useEffect(() => { try { localStorage.setItem('greenlabs:hostPort', hostPort); } catch {} }, [hostPort]);
   useEffect(() => { try { localStorage.setItem('greenlabs:hostTunnel', hostTunnel ? '1' : '0'); } catch {} }, [hostTunnel]);
@@ -1193,15 +1202,28 @@ function App() {
                       : 'Modo Blacklist: O som dos programas listados acima não sairá na sua transmissão de tela.'}
                   </p>
                   <hr className="divider" />
-                  <label className="check-row" onClick={() => {
+                  <label className="check-row" onClick={async () => {
                     const next = !hwAccel;
                     setHwAccel(next);
-                    window.greenlabsApp?.toggleHardwareAcceleration(next);
+                    const r = await window.greenlabsApp?.toggleHardwareAcceleration?.(next);
+                    if (r?.reiniciarParaAplicar) setPrecisaReiniciar(true);
                   }}>
                     <span className={`switch ${hwAccel ? 'on' : ''}`} />
                     Aceleração por Hardware (GPU)
                   </label>
-                  <p className="hint">Ativado = aceleração por placa de vídeo leve. Desative caso ocorram travamentos no driver de vídeo.</p>
+                  <p className="hint">
+                    Se o app travar ao <strong>assistir</strong> uma transmissão, desligue
+                    aqui: em algumas placas o driver congela ao acelerar vídeo.
+                    A troca só vale depois de reiniciar o aplicativo.
+                  </p>
+                  {precisaReiniciar && (
+                    <div className="restart-row">
+                      <span>Reinicie para aplicar a mudança.</span>
+                      <button className="ghost" onClick={() => window.greenlabsApp?.restartApp?.()}>
+                        Reiniciar agora
+                      </button>
+                    </div>
+                  )}
                   <hr className="divider" />
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     <button className="ghost" onClick={() => setFavoriteServer(serverUrl, roomId)}><StarIcon size={15} filled={true} /> Salvar atual como padrão</button>

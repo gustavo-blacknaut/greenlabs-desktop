@@ -3,6 +3,40 @@
 Todas as mudanças notáveis do app desktop, por versão. Formato livre, em
 português, ligado aos [releases do GitHub](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases).
 
+## [0.3.0](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.3.0) — 2026-08-25
+
+Parte da 0.2.5, que é a versão que funcionava, e corrige dois defeitos que
+**já existiam nela** — não vieram das versões 0.2.7/0.2.8, que foram removidas.
+
+- **O app fechava sozinho.** O registro de eventos do Windows mostrava o
+  `AudioCapture.exe` morrendo com uma exceção não tratada em
+  `HttpListener.Start()`: ele não conseguia abrir a porta local `127.0.0.1:25641`
+  porque um capturador de uma execução anterior ainda a segurava, e a exceção
+  derrubava o processo inteiro.
+
+  Essa porta não tem a ver com hospedar nada — é o cano interno por onde o
+  capturador entrega o áudio ao app, e sobe mesmo quando você só assiste.
+
+  Agora o app encerra qualquer capturador esquecido antes de subir o seu e ao
+  sair, e o capturador tenta abrir a porta cinco vezes antes de desistir com um
+  aviso no log, em vez de estourar. Verificado: a colisão que antes matava o
+  processo agora sai limpa.
+
+  Há registro desse crash com a 0.2.5 instalada, ou seja, é antigo.
+
+- **O botão de desligar a aceleração por hardware não fazia nada.** Ele chamava
+  `disableHardwareAcceleration()` quando clicado, mas o Electron só aceita essa
+  chamada antes do app ficar pronto — depois disso é ignorada. A preferência
+  agora fica gravada em disco e é lida na inicialização, com um aviso para
+  reiniciar e um botão que reinicia na hora.
+
+  Isso importa porque a flag `ignore-gpu-blocklist` (mantida igual à 0.2.5)
+  força a aceleração de vídeo mesmo em drivers que o Chromium considera
+  problemáticos. Em algumas máquinas isso congela o app ao **assistir** uma
+  transmissão. Se acontecer, agora dá para desligar de verdade.
+
+As flags de GPU continuam exatamente as sete da 0.2.5.
+
 ## [0.2.9](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.2.9) — 2026-08-25
 
 **Volta o subsistema de áudio para exatamente o da 0.2.5.** As versões 0.2.7 e
