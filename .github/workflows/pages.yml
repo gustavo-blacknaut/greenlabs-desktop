@@ -1,7 +1,12 @@
 name: Publicar site
 
-# O site precisa ser servido por HTTPS: getDisplayMedia só funciona em secure
-# context, então em http:// o compartilhamento de tela nem aparece.
+# Publica o cliente do navegador (a mesma interface do aplicativo) no GitHub
+# Pages. Precisa ser HTTPS: getDisplayMedia só funciona em secure context,
+# então em http:// o compartilhamento de tela nem aparece como opção.
+#
+# Exige o Pages ligado no repositório - Settings, Pages, Source: GitHub
+# Actions. Sem isso o configure-pages falha, que é o que vinha acontecendo
+# desde que este arquivo existe.
 on:
   push:
     branches: [main]

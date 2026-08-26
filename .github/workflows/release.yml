@@ -1,0 +1,82 @@
+name: Release
+
+# Publica os instaladores ao criar uma tag v*.
+#
+# Substitui o workflow que só empacotava Linux. Ele nunca rodava `npm run
+# build`, e o `files` do electron-builder inclui `dist/**/*` — que não está
+# versionado. No CI a pasta simplesmente não existia, e o pacote saía sem
+# interface ou o empacotamento falhava.
+#
+# O Windows também sai daqui agora. Enquanto era compilado na mão, era comum a
+# tag existir e o release ficar sem binário nenhum: foi o que aconteceu da
+# v0.3.5 à v0.3.7.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag a publicar (ex: v0.3.8)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  empacotar:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - sistema: windows-latest
+            nome: windows
+            alvos: --win nsis portable --x64
+            artefatos: |
+              dist-installer/*.exe
+          - sistema: ubuntu-latest
+            nome: linux
+            alvos: --linux AppImage deb tar.gz --x64
+            artefatos: |
+              dist-installer/*.AppImage
+              dist-installer/*.deb
+              dist-installer/*.tar.gz
+
+    runs-on: ${{ matrix.sistema }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      # O passo que faltava. Sem ele o electron-builder empacota sem a
+      # interface: `dist/` é gerado pelo Vite e não vai para o repositório.
+      - name: Compilar a interface
+        run: npm run build
+
+      - name: Conferir que a interface saiu
+        shell: bash
+        run: |
+          test -f dist/index.html || { echo "::error::dist/index.html nao existe"; exit 1; }
+          echo "ok: $(ls dist/assets | wc -l) arquivo(s) em dist/assets"
+
+      - name: Empacotar
+        run: npx electron-builder ${{ matrix.alvos }} -c.directories.output=dist-installer
+
+      - name: Guardar os pacotes
+        uses: actions/upload-artifact@v4
+        with:
+          name: greenlabs-${{ matrix.nome }}
+          path: ${{ matrix.artefatos }}
+
+      - name: Publicar no release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          files: ${{ matrix.artefatos }}
+          generate_release_notes: true
