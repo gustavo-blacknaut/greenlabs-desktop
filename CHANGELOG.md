@@ -3,6 +3,31 @@
 Todas as mudanças notáveis do app desktop, por versão. Formato livre, em
 português, ligado aos [releases do GitHub](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases).
 
+## [0.3.4](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.3.4) — 2026-08-26
+
+Uma correção só, e ela vale por muita coisa.
+
+**Transmissão que não aparecia.** Quando alguém transmitia, o vídeo chegava
+aqui, a conexão ficava de pé, os quadros passavam — e o app mostrava "Nenhuma
+transmissão ativa". Sem erro em lugar nenhum.
+
+A causa: ao receber uma faixa de vídeo, o app fazia
+
+```js
+const stream = event.streams[0];
+if (!stream) return;
+```
+
+Nem toda faixa vem com uma `MediaStream` associada — isso depende de o outro
+lado ter declarado `msid` no SDP. Quando não vinha, a faixa era descartada em
+silêncio. Agora, quando não vem, o app monta uma.
+
+Isso aparecia ao receber do [cliente nativo em C++](https://github.com/gustavo-blacknaut/greenlabs-live-streaming-cpp),
+que está em desenvolvimento, mas atingiria qualquer emissor que não declarasse
+`msid`.
+
+O app Android tem a mesma correção, já que ele carrega este mesmo cliente.
+
 ## [0.3.3](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.3.3) — 2026-08-25
 
 **O servidor de sinalização agora vai compilado dentro do app.** Quando você

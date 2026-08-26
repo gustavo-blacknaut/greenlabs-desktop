@@ -1,7 +1,7 @@
 {
   "name": "greenlabs",
   "productName": "GreenLabs",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "GreenLabs Live Streaming Engine",
   "author": { "name": "GreenLabs", "email": "gustavo.c.raichardt@gmail.com" },
   "private": true,

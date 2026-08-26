@@ -542,8 +542,11 @@ function App() {
     }
     pc.onicecandidate = (event) => { if (event.candidate) send({ type: 'ice', to: peerId, candidate: event.candidate }); };
     pc.ontrack = (event) => {
-      const stream = event.streams[0];
-      if (!stream) return;
+      // Nem toda faixa vem com uma stream associada: depende de o outro lado
+      // ter declarado msid no SDP. Descartar nesse caso fazia o video chegar
+      // e nenhum card aparecer - dava a impressao de que ninguem estava
+      // transmitindo, com a conexao de pe e os quadros passando.
+      const stream = event.streams[0] ?? new MediaStream([event.track]);
       const id = `${peerId}:${stream.id}`;
       const meta = remoteMetaRef.current.get(id);
       setStreams((current) => {
