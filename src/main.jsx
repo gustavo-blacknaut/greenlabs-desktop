@@ -115,6 +115,11 @@ function App() {
   const peersRef = useRef(new Map());
   const localStreamsRef = useRef([]);
   const remoteNamesRef = useRef(new Map());
+  // O servidor avisa, ao entrar, que esta retransmitindo o video. Nesse modo
+  // a lista de participantes serve so para mostrar quem esta na sala: quem
+  // negocia midia e o servidor, e oferecer para as pessoas abriria as
+  // conexoes diretas que o retransmissor existe para evitar.
+  const modoSfuRef = useRef(false);
   const remoteMetaRef = useRef(new Map());
   const pingIntervalRef = useRef(null);
   const lastRttRef = useRef(0);
@@ -272,6 +277,12 @@ function App() {
   // Como o cliente cria uma entrada de participante para todo mundo que lhe
   // oferece, o servidor acabava aparecendo na lista como "Usuario". Ele é
   // infraestrutura, não gente.
+  // Anota o nome para a lista, sem abrir conexao nenhuma.
+  const anotarNome = (peerId, peerName) => {
+    remoteNamesRef.current.set(peerId, peerName || 'Usuario');
+    syncPeers();
+  };
+
   const syncPeers = () => setPeers(
     [...remoteNamesRef.current.entries()]
       .filter(([peerId]) => peerId !== ID_DO_SFU)
@@ -376,15 +387,21 @@ function App() {
       if (message.type === 'joined') {
         peerIdRef.current = message.peerId;
         setConnected(true);
-        message.peers.forEach((peer) => createPeer(peer.peerId, peer.name));
-        for (const peer of message.peers) {
-          localStreamsRef.current.forEach((item) => sendStreamMeta(peer.peerId, item));
-          await makeOffer(peer.peerId);
+        modoSfuRef.current = message.sfu === true;
+
+        if (modoSfuRef.current) {
+          message.peers.forEach((peer) => anotarNome(peer.peerId, peer.name));
+        } else {
+          message.peers.forEach((peer) => createPeer(peer.peerId, peer.name));
+          for (const peer of message.peers) {
+            localStreamsRef.current.forEach((item) => sendStreamMeta(peer.peerId, item));
+            await makeOffer(peer.peerId);
+          }
         }
       }
       if (message.type === 'peer-joined') {
-        createPeer(message.peerId, message.name);
-        syncPeers();
+        if (modoSfuRef.current) anotarNome(message.peerId, message.name);
+        else { createPeer(message.peerId, message.name); syncPeers(); }
       }
       if (message.type === 'peer-left') {
         removePeer(message.peerId);
