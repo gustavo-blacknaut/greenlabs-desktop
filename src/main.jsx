@@ -12,6 +12,10 @@ import {
 import { normalizeServer, cleanDomainOnly, formatUserList } from './lib/format.js';
 import { startWasapiAudioTrack } from './lib/wasapi-audio.js';
 import { hasAndroidScreenCapture, startAndroidScreenCapture, stopAndroidScreenCapture } from './lib/android-screen.js';
+
+// O identificador que o servidor usa quando esta em modo SFU. Ele participa da
+// sala para receber e reenviar video, mas nao e uma pessoa.
+const ID_DO_SFU = 'sfu';
 import CameraPreview from './components/CameraPreview.jsx';
 import StreamCard from './components/StreamCard.jsx';
 import TitleBar from './components/TitleBar.jsx';
@@ -264,7 +268,15 @@ function App() {
   const send = (payload) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(JSON.stringify(payload));
   };
-  const syncPeers = () => setPeers([...remoteNamesRef.current.entries()].map(([peerId, peerName]) => ({ peerId, name: peerName })));
+  // Com o servidor em modo SFU, quem manda as ofertas é ele, e não as pessoas.
+  // Como o cliente cria uma entrada de participante para todo mundo que lhe
+  // oferece, o servidor acabava aparecendo na lista como "Usuario". Ele é
+  // infraestrutura, não gente.
+  const syncPeers = () => setPeers(
+    [...remoteNamesRef.current.entries()]
+      .filter(([peerId]) => peerId !== ID_DO_SFU)
+      .map(([peerId, peerName]) => ({ peerId, name: peerName })),
+  );
 
   const makeOffer = async (peerId, iceRestart = false) => {
     const pc = peersRef.current.get(peerId);
@@ -308,7 +320,7 @@ function App() {
       setStreams((current) => {
         if (current.some((item) => item.id === id)) return current;
         const hasVideo = stream.getVideoTracks().length > 0;
-        return [...current, { id, streamId: stream.id, kind: meta?.kind ?? (hasVideo ? 'screen' : 'camera'), name: meta?.name ?? (hasVideo ? `${remoteNamesRef.current.get(peerId)} - tela` : `${remoteNamesRef.current.get(peerId)} - camera`), ownerName: meta?.ownerName ?? remoteNamesRef.current.get(peerId) ?? 'Usuario', quality: meta?.quality ?? null, stream, volume: 1, hidden: false, local: false, peerId }];
+        return [...current, { id, streamId: stream.id, kind: meta?.kind ?? (hasVideo ? 'screen' : 'camera'), name: meta?.name ?? (peerId === ID_DO_SFU ? (hasVideo ? 'Tela' : 'Camera') : (hasVideo ? `${remoteNamesRef.current.get(peerId)} - tela` : `${remoteNamesRef.current.get(peerId)} - camera`)), ownerName: meta?.ownerName ?? (peerId === ID_DO_SFU ? 'Alguem na sala' : remoteNamesRef.current.get(peerId)) ?? 'Usuario', quality: meta?.quality ?? null, stream, volume: 1, hidden: false, local: false, peerId }];
       });
       setActiveId((selected) => selected ?? id);
     };
