@@ -324,9 +324,16 @@ function App() {
       // Nem toda faixa vem com uma stream associada: depende de o outro lado
       // ter declarado msid no SDP. Descartar nesse caso fazia o video chegar
       // e nenhum card aparecer - dava a impressao de que ninguem estava
-      // transmitindo, com a conexao de pe e os quadros passando.
+      // transmitindo, com a conexao de pe e os quadros passando. Sem stream,
+      // montamos uma.
       const stream = event.streams[0] ?? new MediaStream([event.track]);
-      const id = `${peerId}:${stream.id}`;
+
+      // O identificador do card NAO pode sair da stream montada aqui: cada
+      // `new MediaStream()` sorteia um id novo. Em modo SFU ha renegociacao
+      // toda vez que alguem entra ou sai, o ontrack dispara de novo para a
+      // mesma faixa, e um id sorteado fazia nascer um card a cada vez -
+      // duplicatas acumulando para a mesma pessoa. O id da faixa e estavel.
+      const id = `${peerId}:${event.streams[0]?.id ?? event.track.id}`;
       const meta = remoteMetaRef.current.get(id);
       setStreams((current) => {
         if (current.some((item) => item.id === id)) return current;
