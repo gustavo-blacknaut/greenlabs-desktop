@@ -1,9 +1,9 @@
 # Changelog
 
 Todas as mudanças notáveis do app desktop, por versão. Formato livre, em
-português, ligado aos [releases do GitHub](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases).
+português, ligado aos [releases do GitHub](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases).
 
-## [0.3.4](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.3.4) — 2026-08-26
+## [0.3.4](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.3.4) — 2026-08-26
 
 Uma correção só, e ela vale por muita coisa.
 
@@ -22,17 +22,17 @@ Nem toda faixa vem com uma `MediaStream` associada — isso depende de o outro
 lado ter declarado `msid` no SDP. Quando não vinha, a faixa era descartada em
 silêncio. Agora, quando não vem, o app monta uma.
 
-Isso aparecia ao receber do [cliente nativo em C++](https://github.com/gustavo-blacknaut/greenlabs-live-streaming-cpp),
+Isso aparecia ao receber do [cliente nativo em C++](https://github.com/gustavo-blacknaut/greenlabs-windows),
 que está em desenvolvimento, mas atingiria qualquer emissor que não declarasse
 `msid`.
 
 O app Android tem a mesma correção, já que ele carrega este mesmo cliente.
 
-## [0.3.3](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.3.3) — 2026-08-25
+## [0.3.3](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.3.3) — 2026-08-25
 
 **O servidor de sinalização agora vai compilado dentro do app.** Quando você
 hospeda pelo GreenLabs, quem atende é o
-[servidor em Go](https://github.com/gustavo-blacknaut/greenlabs-live-streaming-server-go),
+[servidor em Go](https://github.com/gustavo-blacknaut/greenlabs-server),
 um executável de 7 MB que vem junto na instalação. Não precisa instalar Go, nem
 Node, nem contratar hospedagem — é só clicar em hospedar.
 
@@ -60,7 +60,7 @@ Detalhes:
 - O processo é encerrado junto com o app, e o servidor em Node continua como
   reserva caso o binário não esteja junto.
 
-## [0.3.2](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.3.2) — 2026-08-25
+## [0.3.2](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.3.2) — 2026-08-25
 
 A 0.3.0 travava assim que a tela era aberta. Como não deu para reproduzir o
 crash aqui, o caminho foi outro: em vez de continuar chutando, os arquivos que
@@ -87,7 +87,7 @@ intocado.
 A 0.3.1 tinha as duas primeiras correções, mas ficou só como build local — não
 chegou a ser publicada.
 
-## [0.3.0](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.3.0) — 2026-08-25
+## [0.3.0](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.3.0) — 2026-08-25
 
 Parte da 0.2.5, que é a versão que funcionava, e corrige dois defeitos que
 **já existiam nela** — não vieram das versões 0.2.7/0.2.8, que foram removidas.
@@ -121,7 +121,7 @@ Parte da 0.2.5, que é a versão que funcionava, e corrige dois defeitos que
 
 As flags de GPU continuam exatamente as sete da 0.2.5.
 
-## [0.2.9](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.2.9) — 2026-08-25
+## [0.2.9](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.2.9) — 2026-08-25
 
 **Volta o subsistema de áudio para exatamente o da 0.2.5.** As versões 0.2.7 e
 0.2.8 travavam o PC, paravam o áudio do resto do sistema e no fim derrubavam o
@@ -144,7 +144,7 @@ As correções da 0.2.7 que dependiam desse caminho foram desfeitas junto —
 prefiro reintroduzir uma de cada vez, testando, do que manter algo que trava a
 máquina.
 
-## [0.2.8](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.2.8) — removida
+## [0.2.8](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.2.8) — removida
 
 **Reverte a mudança da 0.2.7 que quebrou o compartilhamento de tela.** Aquela
 versão trocou o `audio: 'loopback'` do handler de captura do Electron por um
@@ -159,7 +159,7 @@ Tirar o `loopback` não melhora nada e quebra a captura.
 
 As demais correções da 0.2.7 continuam valendo (a lista abaixo).
 
-## [0.2.7](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.2.7) — removida
+## [0.2.7](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.2.7) — removida
 
 Quatro defeitos no áudio, todos localizados no código antes de qualquer correção:
 
@@ -194,11 +194,11 @@ Também:
 
 > **Nota sobre as versões 0.2.2 a 0.2.4:** algumas entradas descreviam
 > correções do app Android como se fossem deste repositório. O app Android tem
-> [repositório e versionamento próprios](https://github.com/gustavo-blacknaut/greenlabs-live-streaming-mobile);
+> [repositório e versionamento próprios](https://github.com/gustavo-blacknaut/greenlabs-android);
 > o que mora aqui é a metade web dessas correções, já que o app embute o mesmo
 > cliente React. Corrigido a partir da 0.2.5.
 
-## [0.2.5](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.2.5) — 2026-08-24
+## [0.2.5](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.2.5) — 2026-08-24
 
 - **Tráfego de sinalização reduzido em até 23x.** Cada ping de cada
   participante disparava um broadcast para a sala inteira — n pings por
@@ -227,7 +227,7 @@ Também:
 - README atualizado: o app Android **transmite tela** desde a v1.0.3 (até
   720p/15fps, via `MediaProjection` nativo), com link para o repositório.
 
-## [0.2.4](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.2.4) — 2026-08-24
+## [0.2.4](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.2.4) — 2026-08-24
 
 - Metade web do ajuste de layout para celular: barra de ações no rodapé
   (transmitir tela, câmera, configuração, entrar/sair), alvos de toque maiores
@@ -235,7 +235,7 @@ Também:
   o layout não correr por baixo das barras do sistema. O layout de desktop não
   muda.
 
-## [0.2.3](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.2.3) — 2026-08-24
+## [0.2.3](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.2.3) — 2026-08-24
 
 - **Áudio sumiu de novo na 0.2.2 — regressão minha, corrigida.** Ao apertar
   o buffer para reduzir o delay, a margem de descarte ficou em 40ms, abaixo
@@ -253,7 +253,7 @@ Também:
   a seção ativa ocupa a tela inteira (medido: 638px em vez de 309px). O
   layout de desktop não muda.
 
-## [0.2.2](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.2.2) — 2026-08-24
+## [0.2.2](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.2.2) — 2026-08-24
 
 - **Delay do áudio da tela reduzido.** Com o áudio realmente chegando no
   remoto (fix da 0.2.1), o delay residual ficou perceptível — o buffer do
@@ -280,7 +280,7 @@ Também:
   transmissão" e "Sair da chamada", direto da notificação, sem precisar
   voltar pro app.
 
-## [0.2.1](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.2.1) — 2026-08-24
+## [0.2.1](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.2.1) — 2026-08-24
 
 Dois bugs que só ficaram visíveis depois que o áudio da tela voltou a
 funcionar (0.2.0 corrigiu a captura, mas a entrega tinha outro problema):
@@ -293,7 +293,7 @@ funcionar (0.2.0 corrigiu a captura, mas a entrega tinha outro problema):
   tela, desde sempre, lançava `ReferenceError` e sumia sem avisar ninguém.
   Declarado o estado que faltava, com um aviso de verdade na tela.
 
-## [0.2.0](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases/tag/v0.2.0) — 2026-08-24
+## [0.2.0](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.2.0) — 2026-08-24
 
 - **Delay de ~1-2s no áudio sem Discord, corrigido.** O buffer do WASAPI
   pedia 5 segundos (sobra de um teste antigo) — reduzido para 200ms. O
@@ -310,7 +310,7 @@ funcionar (0.2.0 corrigiu a captura, mas a entrega tinha outro problema):
 - **Túnel instalável direto pelo app** (cloudflared e ngrok, sem depender
   de winget) e **Radmin VPN** como método de hospedagem sem túnel.
 - **Servidor de sinalização extraído** para o repositório dedicado
-  [greenlabs-live-streaming-server](https://github.com/gustavo-blacknaut/greenlabs-live-streaming-server).
+  [greenlabs-server](https://github.com/gustavo-blacknaut/greenlabs-server).
 - Removidos dois arquivos de ícone duplicados (mesma imagem, nomes
   trocados entre pastas, sem uso).
 - Corrigido um bloco de instruções de hospedagem que tinha ficado

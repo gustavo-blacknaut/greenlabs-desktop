@@ -2,8 +2,8 @@
 //
 // Nenhum navegador Android implementa getDisplayMedia - é limitação da
 // plataforma, não do WebView. Então a captura vem do lado nativo (repositório
-// greenlabs-live-streaming-mobile): MediaProjection gera os frames, codifica em
-// JPEG e entrega por um servidor HTTP local, com o mesmo enquadramento que o
+// greenlabs-android): MediaProjection gera os frames, codifica em JPEG e
+// entrega por um servidor HTTP local, com o mesmo enquadramento que o
 // áudio do WASAPI usa no desktop (4 bytes de tamanho + payload).
 //
 // Aqui só mora a ponte: desenhar esses frames num canvas e usar captureStream()

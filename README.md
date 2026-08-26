@@ -8,7 +8,7 @@ Cada pessoa hospeda o próprio servidor de sinalização. Não existe servidor
 central: o vídeo e o áudio vão direto entre os participantes (WebRTC P2P), e o
 servidor só serve para as pessoas se encontrarem.
 
-- Repositório: <https://github.com/gustavo-blacknaut/greenlabs-live-streaming>
+- Repositório: <https://github.com/gustavo-blacknaut/greenlabs-desktop>
 
 ---
 
@@ -67,14 +67,14 @@ aberto depois já entra na transmissão automaticamente.
 
 ### Usuário final
 
-Baixe o instalador em [Releases](https://github.com/gustavo-blacknaut/greenlabs-live-streaming/releases)
+Baixe o instalador em [Releases](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases)
 e execute. O app fica na bandeja do sistema e inicia com o Windows.
 
 ### A partir do código
 
 ```bash
-git clone https://github.com/gustavo-blacknaut/greenlabs-live-streaming.git
-cd greenlabs-live-streaming
+git clone https://github.com/gustavo-blacknaut/greenlabs-desktop.git
+cd greenlabs-desktop
 npm install
 npm run app
 ```
@@ -131,7 +131,7 @@ Servidor em rede local por IP só funciona pelo app.
 | Plataforma | Compartilhar tela | Qualidade | Motivo |
 |---|---|---|---|
 | App Windows | ✅ | até 1080p 60fps | `getDisplayMedia` + WASAPI |
-| **[App Android](https://github.com/gustavo-blacknaut/greenlabs-live-streaming-mobile)** | ✅ | até 720p 15fps | `MediaProjection` nativo |
+| **[App Android](https://github.com/gustavo-blacknaut/greenlabs-android)** | ✅ | até 720p 15fps | `MediaProjection` nativo |
 | Chrome/Edge/Firefox desktop (HTTPS) | ✅ | até 1080p 60fps | `getDisplayMedia` disponível |
 | Safari desktop | ✅ | até 1080p 60fps | `getDisplayMedia` disponível |
 | Qualquer navegador em HTTP | ❌ | — | exige secure context |
@@ -165,7 +165,7 @@ quiser acesso pela internet, e clique em **Iniciar servidor**.
 
 O servidor roda dentro do próprio GreenLabs — não precisa de terminal, nem de
 Node, nem de Go instalado. Quem atende é o
-[servidor em Go](https://github.com/gustavo-blacknaut/greenlabs-live-streaming-server-go),
+[servidor em Go](https://github.com/gustavo-blacknaut/greenlabs-server),
 um executável de 7 MB que vem junto na instalação, em processo separado do app.
 
 Ficar fora do processo do Electron é o que importa aqui: antes a sinalização
@@ -227,7 +227,7 @@ Para hospedar em VPS, Linux, Windows como serviço, Pterodactyl ou Docker, sem
 precisar baixar o app de desktop inteiro, existe um repositório dedicado só
 para o servidor:
 
-**→ [github.com/gustavo-blacknaut/greenlabs-live-streaming-server](https://github.com/gustavo-blacknaut/greenlabs-live-streaming-server)**
+**→ [github.com/gustavo-blacknaut/greenlabs-server](https://github.com/gustavo-blacknaut/greenlabs-server)**
 
 Lá tem o passo a passo completo de cada método:
 
@@ -246,7 +246,7 @@ Lá tem o passo a passo completo de cada método:
 O servidor mudou nesta versão. Se você já tinha uma instância no ar:
 
 ```bash
-cd greenlabs-live-streaming
+cd greenlabs-desktop
 git pull
 npm install --omit=dev
 sudo systemctl restart greenlabs   # ou reinicie como você subiu
@@ -478,8 +478,8 @@ loopback e a necessidade de um completion handler *agile*.
 
 ### Projetos relacionados
 
-- [greenlabs-live-streaming-server](https://github.com/gustavo-blacknaut/greenlabs-live-streaming-server) — só o servidor, para hospedar sem baixar o app inteiro
-- [greenlabs-live-streaming-mobile](https://github.com/gustavo-blacknaut/greenlabs-live-streaming-mobile) — cliente Android
+- [greenlabs-server](https://github.com/gustavo-blacknaut/greenlabs-server) — só o servidor, para hospedar sem baixar o app inteiro
+- [greenlabs-android](https://github.com/gustavo-blacknaut/greenlabs-android) — cliente Android
 
 ### Stack
 
