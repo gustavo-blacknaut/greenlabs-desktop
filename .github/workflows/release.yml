@@ -79,7 +79,21 @@ jobs:
           # O appimagetool precisa de FUSE, que nao existe no runner. Com isto
           # ele se extrai e roda direto, sem montar nada.
           APPIMAGE_EXTRACT_AND_RUN: 1
-        run: npx electron-builder ${{ matrix.alvos }} -c.directories.output=dist-installer
+        run: |
+          # A saida vai para arquivo e as ultimas linhas viram anotacao de erro.
+          # O log completo do job so e legivel por quem tem admin do
+          # repositorio; anotacao aparece na API publica, entao da para
+          # diagnosticar sem depender de acesso.
+          set -o pipefail
+          npx electron-builder ${{ matrix.alvos }} -c.directories.output=dist-installer 2>&1 | tee /tmp/saida.txt
+          codigo=${PIPESTATUS[0]}
+          if [ "$codigo" != "0" ]; then
+            echo "::error::empacotamento falhou (codigo $codigo)"
+            tail -25 /tmp/saida.txt | while IFS= read -r linha; do
+              echo "::error::${linha}"
+            done
+            exit "$codigo"
+          fi
 
       - name: Guardar os pacotes
         uses: actions/upload-artifact@v4
