@@ -91,8 +91,10 @@ jobs:
             # repositorio. Anotacao de erro aparece na API publica, entao da
             # para diagnosticar sem depender de acesso.
             echo "::error::empacotamento falhou (codigo $codigo)"
-            grep -iE "error|erro|failed|cannot|ENOENT|not found" /tmp/saida.txt | tail -12 | while IFS= read -r linha; do
-              echo "::error::$linha"
+            # Sem filtro: um grep que nao casa nada deixa a falha muda, que foi
+            # exatamente o que aconteceu na tentativa anterior.
+            tail -20 /tmp/saida.txt | while IFS= read -r linha; do
+              [ -n "$linha" ] && echo "::error::$linha"
             done
             exit "$codigo"
           fi
