@@ -21,6 +21,7 @@ import StreamCard from './components/StreamCard.jsx';
 import TitleBar from './components/TitleBar.jsx';
 import ZoomPane from './components/ZoomPane.jsx';
 import { HiddenVisual, VideoPlayer } from './components/VideoPlayer.jsx';
+import AvisoServidor from './components/AvisoServidor.jsx';
 
 function App() {
   const [serverUrl, setServerUrl] = useState(() => {
@@ -836,6 +837,8 @@ function App() {
               </label>
             </div>
 
+            <AvisoServidor endereco={obServer} />
+
             <p className="hint">
               Pode digitar com ou sem <code>ws://</code>
               {obServer.trim() ? <> — vai conectar em <strong>{normalizeServer(obServer)}</strong></> : null}
@@ -946,6 +949,7 @@ function App() {
                 <div className="field-grid">
                   <label>Seu Nome de Usuário<input value={name} onChange={(e) => setName(e.target.value)} placeholder="Digite seu nome..." /></label>
                   <label>Servidor (HTTP/WS)<input value={serverUrl} onChange={(e) => setServerUrl(e.target.value)} placeholder="localhost:25640" /></label>
+                  <AvisoServidor endereco={serverUrl} />
                   <div className="split-fields">
                     <label>Sala<input value={roomId} onChange={(e) => setRoomId(e.target.value)} /></label>
                     <label>Qualidade da tela

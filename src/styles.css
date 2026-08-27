@@ -2431,3 +2431,31 @@ h2 {
 .tunnel-providers {
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
+
+/* Aviso de servidor de terceiro.
+   Amarelo e nao vermelho de proposito: nao e erro, e uma escolha informada. */
+.aviso-servidor {
+  margin: 12px 0 4px;
+  padding: 12px 14px;
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  background: rgba(234, 179, 8, 0.08);
+  border-radius: 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.aviso-servidor strong {
+  display: block;
+  color: #eab308;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.aviso-servidor p { margin: 0; color: #d4d4d8; }
+.aviso-servidor code {
+  color: #fde047;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.aviso-servidor-fim { margin-top: 6px !important; color: #a1a1aa !important; }
