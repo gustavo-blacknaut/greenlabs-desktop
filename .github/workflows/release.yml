@@ -86,6 +86,15 @@ jobs:
           npx electron-builder ${{ matrix.alvos }} -c.directories.output=dist-installer > /tmp/saida.txt 2>&1
           codigo=$?
           cat /tmp/saida.txt
+
+          # Tambem no resumo do run: aparece na propria pagina do workflow, sem
+          # precisar abrir o log nem ter permissao de admin.
+          {
+            echo "## Saida do empacotamento (${{ matrix.nome }})"
+            echo '```'
+            tail -60 /tmp/saida.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
           if [ "$codigo" != "0" ]; then
             # O log completo do job so e legivel por quem tem admin do
             # repositorio. Anotacao de erro aparece na API publica, entao da
