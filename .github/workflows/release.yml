@@ -70,6 +70,15 @@ jobs:
           echo "ok: $(ls dist/assets | wc -l) arquivo(s) em dist/assets"
 
       - name: Empacotar
+        # shell: bash tambem no Windows. O runner usa PowerShell por padrao, e
+        # ele quebra "-c.directories.output=dist-installer" em pedacos: o
+        # electron-builder acaba tentando abrir ".directories.output=..." como
+        # se fosse um arquivo de configuracao, e morre com ENOENT.
+        shell: bash
+        env:
+          # O appimagetool precisa de FUSE, que nao existe no runner. Com isto
+          # ele se extrai e roda direto, sem montar nada.
+          APPIMAGE_EXTRACT_AND_RUN: 1
         run: npx electron-builder ${{ matrix.alvos }} -c.directories.output=dist-installer
 
       - name: Guardar os pacotes
