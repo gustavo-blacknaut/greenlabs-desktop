@@ -837,7 +837,7 @@ function App() {
               </label>
             </div>
 
-            <AvisoServidor endereco={obServer} />
+            <AvisoServidor />
 
             <p className="hint">
               Pode digitar com ou sem <code>ws://</code>
@@ -949,7 +949,7 @@ function App() {
                 <div className="field-grid">
                   <label>Seu Nome de Usuário<input value={name} onChange={(e) => setName(e.target.value)} placeholder="Digite seu nome..." /></label>
                   <label>Servidor (HTTP/WS)<input value={serverUrl} onChange={(e) => setServerUrl(e.target.value)} placeholder="localhost:25640" /></label>
-                  <AvisoServidor endereco={serverUrl} />
+                  <AvisoServidor />
                   <div className="split-fields">
                     <label>Sala<input value={roomId} onChange={(e) => setRoomId(e.target.value)} /></label>
                     <label>Qualidade da tela

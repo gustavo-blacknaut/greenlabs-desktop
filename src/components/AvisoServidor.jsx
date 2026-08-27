@@ -1,50 +1,26 @@
 import React from 'react';
-import { cleanDomainOnly } from '../lib/format.js';
-
-// Domínios da GreenCodes. Servidor fora desta lista é de terceiro, e quem opera
-// um servidor de terceiro pode gravar o que passa por ele.
-const CONFIAVEIS = ['greencodes.com.br', 'greenlabs.greencodes.com.br'];
-
-// Endereços da própria máquina: quem hospeda é você, então não há terceiro.
-const LOCAIS = ['localhost', '127.0.0.1', '::1', '0.0.0.0'];
-
-export function servidorEhDeTerceiro(endereco) {
-  const host = (cleanDomainOnly(endereco) || '').split(':')[0].toLowerCase();
-  if (!host) return false;
-  if (LOCAIS.includes(host)) return false;
-
-  // Faixas privadas: rede local, VPN tipo Radmin, container.
-  if (/^10\./.test(host)) return false;
-  if (/^192\.168\./.test(host)) return false;
-  if (/^172\.(1[6-9]|2\d|3[01])\./.test(host)) return false;
-  if (/^26\./.test(host)) return false; // Radmin VPN
-
-  return !CONFIAVEIS.some((d) => host === d || host.endsWith(`.${d}`));
-}
 
 /**
- * Aviso de que o servidor não é da GreenCodes.
+ * Aviso sobre o servidor escolhido.
  *
- * Isto não é formalidade jurídica: quando o servidor está em modo
- * retransmissor, o vídeo e o áudio passam por ele de verdade — é assim que ele
- * resolve quem não consegue conexão direta. Quem opera a máquina pode gravar
- * tudo, e não há como o aplicativo impedir. Quem entra num endereço que alguém
- * mandou no chat merece saber disso antes, não depois.
+ * Sempre visível, sem lista de domínios confiáveis. A primeira versão tentava
+ * adivinhar quem era de confiança pelo endereço e errava: o br-02 é da
+ * GreenCodes e aparecia como suspeito. E a lista nunca ficaria certa - o que
+ * importa não é o domínio, é quem opera a máquina.
+ *
+ * O aviso importa porque com o retransmissor ligado o vídeo e o áudio passam
+ * pelo servidor de verdade. É assim que ele resolve quem não consegue conexão
+ * direta, e é o preço: quem opera aquela máquina pode gravar o que passa.
  */
-export default function AvisoServidor({ endereco }) {
-  if (!servidorEhDeTerceiro(endereco)) return null;
-
-  const host = (cleanDomainOnly(endereco) || '').split(':')[0];
-
+export default function AvisoServidor() {
   return (
-    <div className="aviso-servidor" role="alert">
-      <strong>Servidor de terceiro</strong>
+    <div className="aviso-servidor" role="note">
+      <strong>Entre só em servidor de confiança</strong>
       <p>
-        <code>{host}</code> não é da GreenCodes. Quem opera esse servidor pode
-        gravar sua tela e seu áudio, porque eles passam por lá quando a conexão
-        direta não fecha.
+        Sua tela e seu áudio podem passar pelo servidor quando a conexão direta
+        entre vocês não fecha. Quem opera a máquina consegue gravar o que passa
+        por ela.
       </p>
-      <p className="aviso-servidor-fim">Entre só em servidor de quem você confia.</p>
     </div>
   );
 }
