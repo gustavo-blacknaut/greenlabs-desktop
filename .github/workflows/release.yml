@@ -31,12 +31,12 @@ jobs:
         include:
           - sistema: windows-latest
             nome: windows
-            alvos: --win nsis portable --x64
+            alvos: --win --x64
             artefatos: |
               dist-installer/*.exe
           - sistema: ubuntu-latest
             nome: linux
-            alvos: --linux AppImage deb tar.gz --x64
+            alvos: --linux --x64
             artefatos: |
               dist-installer/*.AppImage
               dist-installer/*.deb
@@ -56,6 +56,10 @@ jobs:
 
       # O passo que faltava. Sem ele o electron-builder empacota sem a
       # interface: `dist/` é gerado pelo Vite e não vai para o repositório.
+      #
+      # Os alvos não são repetidos na linha de comando de propósito: eles já
+      # estão no package.json, e passar de novo fazia o empacotamento falhar
+      # nos dois sistemas.
       - name: Compilar a interface
         run: npm run build
 
