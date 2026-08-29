@@ -37,7 +37,14 @@ export async function abrirAudioDoSistema(): Promise<FaixaDoSistema> {
   // engasgo da thread principal (desenho, coleta de lixo) virava irregularidade
   // no ritmo dos pacotes - e o jitter buffer do WebRTC respondia crescendo o
   // atraso de reproducao para compensar. O anel em si esta no worklet.
-  await contexto.audioWorklet.addModule('./wasapi-audio-worklet.js');
+  // Em desenvolvimento o Vite transforma o .ts na hora, pelo proprio caminho
+  // de origem. No build ele vira wasapi-worklet.js, uma entrada separada -
+  // ver vite.config.ts. Sao dois enderecos porque o AudioWorklet so aceita
+  // URL, e nao passa pelo grafo de modulos que resolveria isso sozinho.
+  const enderecoDoWorklet = import.meta.env.DEV
+    ? '/src/audio/wasapi-worklet.ts'
+    : './wasapi-worklet.js';
+  await contexto.audioWorklet.addModule(enderecoDoWorklet);
   const no = new AudioWorkletNode(contexto, 'wasapi-audio-processor', {
     numberOfInputs: 0,
     numberOfOutputs: 1,
