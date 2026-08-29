@@ -1,7 +1,7 @@
 {
   "name": "greenlabs",
   "productName": "GreenLabs",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "GreenLabs Live Streaming Engine",
   "author": {
     "name": "GreenLabs",
@@ -101,15 +101,19 @@
     ]
   },
   "dependencies": {
-    "ws": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "ws": "latest"
   },
   "devDependencies": {
+    "@types/node": "^26.4.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
     "@vitejs/plugin-react": "latest",
     "concurrently": "latest",
     "electron": "latest",
     "electron-builder": "latest",
+    "typescript": "^7.0.2",
     "vite": "latest",
     "wait-on": "latest"
   }

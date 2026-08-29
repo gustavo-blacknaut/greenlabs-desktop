@@ -15,3 +15,6 @@ electron/mute-audio-debug.log
 # A copia em Node que vivia aqui saiu do repositorio para nao existirem duas
 # versoes do mesmo servidor, cada uma com um comportamento.
 server/
+
+# A logo mestra e logo.png. O arquivo _hd era a mesma imagem com outro nome.
+logo_greencodes_hd.png
