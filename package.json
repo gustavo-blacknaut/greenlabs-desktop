@@ -43,7 +43,7 @@
       "package.json"
     ],
     "win": {
-      "icon": "logo.png",
+      "icon": "build/icon.ico",
       "target": [
         {
           "target": "nsis",
@@ -61,7 +61,7 @@
       "artifactName": "GreenLabs-Setup-${version}.${ext}"
     },
     "linux": {
-      "icon": "logo.png",
+      "icon": "build/icon.png",
       "category": "AudioVideo",
       "target": [
         {
