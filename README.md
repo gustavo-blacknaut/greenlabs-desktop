@@ -184,14 +184,12 @@ Clicar em **Parar servidor** encerra tudo e libera a porta.
 
 ### Pelo terminal
 
-Para hospedar sem abrir a interface — em uma VPS, por exemplo:
+Para hospedar sem abrir a interface — em uma VPS, por exemplo — use o servidor
+em Go, que e o unico servidor do GreenLabs:
 
-```bash
-npm run host              # só rede local / Radmin VPN
-npm run host:tunnel       # + túnel público (cloudflared ou ngrok)
-```
+**→ [github.com/gustavo-blacknaut/greenlabs-server](https://github.com/gustavo-blacknaut/greenlabs-server)**
 
-Ele sobe o servidor e lista os endereços que você pode compartilhar:
+Ele sobe e lista os endereços que você pode compartilhar:
 
 ```
   Enderecos para quem esta na mesma rede:
@@ -209,13 +207,13 @@ A porta `25640` é só o padrão do projeto — não tem nada de especial nela.
 de 1024 serve.
 
 ```bash
-npm run host -- --port 30000
+greenlabs-server --port 30000
 ```
 
 Ou por variável de ambiente:
 
 ```bash
-PORT=30000 node server/signaling.js
+PORT=30000 greenlabs-server
 ```
 
 Quem entra precisa usar a mesma porta no endereço (`ws://SEU_IP:30000`). Ao usar
@@ -254,10 +252,9 @@ sudo systemctl restart greenlabs   # ou reinicie como você subiu
 
 O que mudou:
 
-- `signaling.js` agora exporta `startSignaling()` além de rodar direto. Continua
-  funcionando com `node server/signaling.js` e com `PORT=...` do mesmo jeito.
-- Novos arquivos `server/tunnel.js` e `server/host.js` (opcionais para uma VPS —
-  são usados pelo `npm run host` e pela aba Hospedar do app).
+- O servidor em Node saiu deste repositório. O servidor do GreenLabs é o de Go,
+  em [greenlabs-server](https://github.com/gustavo-blacknaut/greenlabs-server):
+  ter duas versões do mesmo servidor só produzia dúvida sobre qual valia.
 - **Correção no ping**: antes o servidor calculava a latência dos participantes
   como `horárioDoServidor - horárioDoCliente`, o que na prática media a diferença
   de relógio entre as máquinas, não a latência. Agora o cliente envia o RTT que
@@ -381,9 +378,6 @@ tenha download suficiente para receber os streams.
 npm install
 npm run app        # Vite + Electron juntos
 npm run dev        # só o front (http://localhost:5173)
-npm run server     # só a sinalização
-npm run host       # sinalização + endereços da rede
-npm run host:tunnel
 npm run build      # front de produção
 npm run build:installer
 ```

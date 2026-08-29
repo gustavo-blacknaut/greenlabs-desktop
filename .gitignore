@@ -11,3 +11,8 @@ electron/mute-audio-debug.log
 *.cjs.bak
 
 # Configuracao local de ferramenta; nao vai para o repositorio.
+
+# O servidor de sinalizacao mora no repositorio greenlabs-server, em Go.
+# A copia em Node que vivia aqui saiu do repositorio para nao existirem duas
+# versoes do mesmo servidor, cada uma com um comportamento.
+server/

@@ -15,15 +15,12 @@
     "dev": "vite --host 0.0.0.0",
     "electron": "electron .",
     "app": "concurrently -k \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
-    "server": "node server/signaling.js",
     "build": "vite build",
     "build:exe": "npm run build && electron-builder --win nsis --x64",
     "build:linux": "npm run build && electron-builder --linux --x64 -c.directories.output=dist-installer",
     "build:installer": "npm run build && electron-builder --win nsis --x64 -c.directories.output=dist-installer",
     "build:dir": "npm run build && electron-builder --dir --win --x64",
-    "preview": "vite preview --host 0.0.0.0",
-    "host": "node server/host.js",
-    "host:tunnel": "node server/host.js --tunnel"
+    "preview": "vite preview --host 0.0.0.0"
   },
   "build": {
     "appId": "com.greenlabs.call",
