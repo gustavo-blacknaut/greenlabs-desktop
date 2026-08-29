@@ -11,8 +11,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { configurarSender, novoId, SERVIDORES_ICE } from '@/lib/midia';
-import { desempatarNomes, normalizarServidor } from '@/lib/formato';
+import { configurarSender, novoId, SERVIDORES_ICE } from '@/lib/media';
+import { desempatarNomes, normalizarServidor } from '@/lib/format';
+import { lerMensagem } from '@/types/schemas';
 import {
   ID_DO_SFU,
   type IdDeCartao,
@@ -24,7 +25,7 @@ import {
   type PerfilDeQualidade,
   type TipoDeTransmissao,
   type Transmissao,
-} from '@/tipos/dominio';
+} from '@/types/domain';
 
 export interface AoEncerrarTela {
   (): void;
@@ -61,6 +62,16 @@ export interface Chamada {
     qualidade: PerfilDeQualidade,
   ): Promise<void>;
   encerrar(id: IdDeCartao): Promise<void>;
+
+  /**
+   * Anexa uma faixa a uma transmissao que ja esta no ar, e renegocia.
+   *
+   * Existe por causa do audio do sistema: ele demora a abrir, e esperar por ele
+   * atrasaria o video em segundos. Entao o video sai na hora e o audio entra
+   * depois - e sem renegociar, o `ontrack` do outro lado nunca dispara e o som
+   * simplesmente nao chega, mesmo estando sendo enviado.
+   */
+  anexarFaixa(id: IdDeCartao, faixa: MediaStreamTrack): Promise<void>;
 
   escolherAtiva(id: IdDeCartao | null): void;
   ajustarVolume(id: IdDeCartao, volume: number): void;
@@ -374,6 +385,28 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
     [encerrar, enviarMeta, oferecer],
   );
 
+  const anexarFaixa = useCallback(
+    async (id: IdDeCartao, faixa: MediaStreamTrack) => {
+      const item = locais.current.find((t) => t.id === id);
+      if (!item) return;
+
+      // Stream nova com o que ja havia mais a faixa que chegou. Nao da para
+      // acrescentar numa MediaStream que ja esta sendo enviada: os senders
+      // apontam para as faixas, nao para a stream.
+      const juntas = new MediaStream([...item.stream.getTracks(), faixa]);
+      const atualizada: Transmissao = { ...item, stream: juntas };
+
+      locais.current = locais.current.map((t) => (t.id === id ? atualizada : t));
+      setTransmissoes((atuais) => atuais.map((t) => (t.id === id ? atualizada : t)));
+
+      for (const [parId, pc] of pares.current.entries()) {
+        pc.addTrack(faixa, juntas);
+        await oferecer(parId).catch(() => {});
+      }
+    },
+    [oferecer],
+  );
+
   const escolherAtiva = useCallback((id: IdDeCartao | null) => setAtivaId(id), []);
 
   const ajustarVolume = useCallback((id: IdDeCartao, volume: number) => {
@@ -547,12 +580,11 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
       };
 
       soquete.onmessage = (evento) => {
-        try {
-          void tratarMensagem(JSON.parse(String(evento.data)) as MensagemRecebida);
-        } catch {
-          // Mensagem que nao e JSON, ou de uma versao mais nova do servidor.
-          // Ignorar uma e melhor que derrubar a chamada inteira.
-        }
+        // Validado antes de entrar, e nao convertido com um `as`: o servidor
+        // pode ser de outra versao, e uma mensagem que este cliente nao entende
+        // nao pode virar campo indefinido tres camadas adiante.
+        const mensagem = lerMensagem(String(evento.data));
+        if (mensagem) void tratarMensagem(mensagem);
       };
 
       soquete.onclose = () => {
@@ -597,6 +629,7 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
     desconectar,
     publicar,
     encerrar,
+    anexarFaixa,
     escolherAtiva,
     ajustarVolume,
     alternarOculta,

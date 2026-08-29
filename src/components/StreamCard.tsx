@@ -2,7 +2,7 @@ import type { MouseEvent as ReactMouseEvent, WheelEvent as ReactWheelEvent } fro
 
 import { CameraIcon, CloseIcon, EyeIcon, EyeOffIcon, MonitorIcon } from '@/icons';
 import { VideoPlayer, VisualOculto } from '@/components/VideoPlayer';
-import type { IdDeCartao, TipoDeTransmissao, Transmissao } from '@/tipos/dominio';
+import type { IdDeCartao, TipoDeTransmissao, Transmissao } from '@/types/domain';
 
 const PASSO_DA_RODA = 0.05;
 

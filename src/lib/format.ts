@@ -1,6 +1,6 @@
 // Normalizacao do endereco do servidor e nomes da lista de participantes.
 
-import type { Participante } from '@/tipos/dominio';
+import type { Participante } from '@/types/domain';
 
 /**
  * Aceita o endereco do jeito que a pessoa digitar.

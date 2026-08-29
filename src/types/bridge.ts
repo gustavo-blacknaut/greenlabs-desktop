@@ -17,10 +17,15 @@ export interface FonteDeTela {
   thumbnail?: string;
 }
 
-/** Um processo em execucao, para a lista de exclusao de audio. */
+/**
+ * Um processo em execucao, para a lista de exclusao de audio.
+ *
+ * `name` e o nome do executavel, que e o que o filtro de audio compara.
+ * `title` e o titulo da janela, que e o que a pessoa reconhece na tela.
+ */
 export interface ProcessoEmExecucao {
-  pid: number;
-  nome: string;
+  name: string;
+  title: string;
 }
 
 export type ProvedorDeTunel = 'cloudflared' | 'ngrok';
@@ -38,6 +43,19 @@ export interface ProvedoresDeTunel {
   bundled?: Partial<Record<ProvedorDeTunel, boolean>>;
 }
 
+/**
+ * Um endereco por interface de rede.
+ *
+ * `vpn` marca o que veio de Radmin, Hamachi ou parecido: e o endereco que
+ * costuma funcionar para quem nao esta na mesma casa, e por isso merece
+ * destaque na lista.
+ */
+export interface EnderecoDaRede {
+  address: string;
+  name: string;
+  vpn?: boolean;
+}
+
 /** Estado da aba Hospedar. Os nomes sao os do processo principal. */
 export interface EstadoDeHospedagem {
   running: boolean;
@@ -46,7 +64,7 @@ export interface EstadoDeHospedagem {
   tunnelUrl: string | null;
   tunnelError: string | null;
   /** Enderecos da rede local que servem para quem esta na mesma casa. */
-  addresses: string[];
+  addresses: EnderecoDaRede[];
 }
 
 export interface OpcoesDeHospedagem {

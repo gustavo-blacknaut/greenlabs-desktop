@@ -35,5 +35,5 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "electron/tipos.d.ts", "vite.config.ts"]
+  "include": ["src", "electron/types.d.ts", "vite.config.ts"]
 }

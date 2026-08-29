@@ -103,7 +103,8 @@
   "dependencies": {
     "react": "latest",
     "react-dom": "latest",
-    "ws": "latest"
+    "ws": "latest",
+    "zod": "^4.5.2"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",

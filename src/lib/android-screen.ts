@@ -10,7 +10,7 @@
 // captureStream() para virar uma MediaStream de verdade. Dai em diante e o
 // mesmo caminho de uma camera, e o resto do WebRTC nao sabe a diferenca.
 
-import type { PerfilDeQualidade } from '@/tipos/dominio';
+import type { PerfilDeQualidade } from '@/types/domain';
 
 /** A ponte que o app Android pendura na janela do WebView. */
 interface PonteAndroid {
@@ -22,6 +22,13 @@ interface PonteAndroid {
 declare global {
   interface Window {
     greenlabsMobile?: PonteAndroid;
+    /**
+     * A notificacao de gravacao do Android chama isto para sair da chamada.
+     *
+     * Ela sobrevive enquanto a captura existir, independente de qual tela a
+     * iniciou - por isso o gancho e global, e nao um callback passado adiante.
+     */
+    __glLeaveCall?: () => void;
     /** O lado nativo chama estas duas para responder o pedido de captura. */
     __glScreenReady?: (porta: number) => void;
     __glScreenError?: (mensagem: string) => void;

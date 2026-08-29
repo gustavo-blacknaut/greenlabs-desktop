@@ -11,7 +11,7 @@ import {
   guardar,
   restaurarPadraoDeFabrica,
   type Preferencias,
-} from '@/lib/preferencias';
+} from '@/lib/preferences';
 
 export interface UsoDePreferencias {
   preferencias: Preferencias;

@@ -7,7 +7,8 @@
 //
 // Aqui a chave, o tipo, o padrao e a leitura ficam no mesmo lugar, uma vez so.
 
-import type { ServidorSalvo } from '@/tipos/dominio';
+import { esquemaDeServidores } from '@/types/schemas';
+import type { ServidorSalvo } from '@/types/domain';
 
 export const SERVIDOR_PADRAO = 'ws://localhost:25640';
 export const SALA_PADRAO = 'call1';
@@ -97,16 +98,12 @@ function lerServidores(): ServidorSalvo[] {
   const bruto = ler(CHAVES.servidores);
   if (!bruto) return padrao;
 
+  // Validado pelo esquema, e nao por checagem manual campo a campo: um
+  // localStorage com lixo - de uma versao antiga, ou editado a mao - devolve a
+  // lista padrao em vez de derrubar a tela na primeira leitura.
   try {
-    const lido: unknown = JSON.parse(bruto);
-    if (!Array.isArray(lido) || lido.length === 0) return padrao;
-
-    // Valida item a item: uma entrada estragada nao pode levar a lista junto.
-    const validos = lido.filter(
-      (item): item is ServidorSalvo =>
-        typeof item === 'object' && item !== null && typeof (item as ServidorSalvo).url === 'string',
-    );
-    return validos.length ? validos : padrao;
+    const lido = esquemaDeServidores.safeParse(JSON.parse(bruto));
+    return lido.success && lido.data.length > 0 ? lido.data : padrao;
   } catch {
     return padrao;
   }

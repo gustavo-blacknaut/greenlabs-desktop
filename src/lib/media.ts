@@ -1,7 +1,7 @@
 // Constantes e ajudantes de midia: perfis de qualidade, servidores ICE e o
 // ajuste do sender. Nada aqui depende de React nem do Electron.
 
-import type { PerfilDeQualidade } from '@/tipos/dominio';
+import type { PerfilDeQualidade } from '@/types/domain';
 
 export const SERVIDORES_ICE: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },

@@ -1083,6 +1083,11 @@ h2 {
   to { opacity: 1; }
 }
 
+/* Fundo OPACO, e nao var(--panel).
+   O --panel tem 86% de opacidade, o que serve para um painel apoiado no fundo
+   da pagina. Num modal ele deixa o texto de tras atravessar as letras da
+   frente, e o backdrop-filter do overlay nem sempre pega para esconder isso.
+   Modal precisa de fundo solido. */
 .picker-modal {
   display: flex;
   flex-direction: column;
@@ -1091,7 +1096,7 @@ h2 {
   max-height: 85vh;
   border: 1px solid var(--line);
   border-radius: 24px;
-  background: var(--panel);
+  background: #0d1119;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
   overflow: hidden;
 }

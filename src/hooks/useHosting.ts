@@ -11,7 +11,7 @@ import type {
   ProgressoDeInstalacao,
   ProvedorDeTunel,
   ProvedoresDeTunel,
-} from '@/tipos/ponte';
+} from '@/types/bridge';
 
 export interface InstalacaoEmCurso {
   provedor: ProvedorDeTunel;
