@@ -54,7 +54,7 @@ export default function ConnectionTab({
   return (
     <div className="field-grid">
       <label>
-        Seu nome de usuário
+        Seu nome
         <input
           value={preferencias.nome}
           onChange={(evento) => definir('nome', evento.target.value)}
@@ -63,7 +63,7 @@ export default function ConnectionTab({
       </label>
 
       <label>
-        Servidor (HTTP/WS)
+        Servidor
         <input
           value={servidor}
           onChange={(evento) => aoMudarServidor(evento.target.value)}
@@ -97,7 +97,7 @@ export default function ConnectionTab({
       <hr className="divider" />
 
       <label>
-        Modo de filtro do som da transmissão
+        O que os outros ouvem
         <select
           className="styled-select"
           value={preferencias.modoDeFiltro}
@@ -111,12 +111,8 @@ export default function ConnectionTab({
             )
           }
         >
-          <option value="blacklist">
-            Blacklist — silenciar apenas os programas listados
-          </option>
-          <option value="whitelist">
-            Whitelist — silenciar tudo, exceto os programas listados
-          </option>
+          <option value="blacklist">Tudo, menos os programas que eu escolher</option>
+          <option value="whitelist">Só os programas que eu escolher</option>
         </select>
       </label>
 
@@ -124,7 +120,7 @@ export default function ConnectionTab({
         <div className="process-selector-wrap">
           <div className="block-title">
             <CameraIcon size={14} />{' '}
-            <span>Seleção rápida de aplicativos ({processos.length} abertos)</span>
+            <span>Programas abertos agora ({processos.length})</span>
           </div>
           <div className="process-chips-grid scrollable-area">
             {processos.map((processo) => {
@@ -148,9 +144,7 @@ export default function ConnectionTab({
       )}
 
       <label>
-        {ehWhitelist
-          ? 'Transmitir apenas o som destes programas'
-          : 'Excluir o som destes programas'}
+        {ehWhitelist ? 'Mandar só o som destes' : 'Não mandar o som destes'}
         <input
           value={listaAtual}
           onChange={(evento) => definir('aplicativosExcluidos', evento.target.value)}
@@ -160,8 +154,8 @@ export default function ConnectionTab({
 
       <p className="hint">
         {ehWhitelist
-          ? 'Whitelist silencia todos os sons do Windows — inclusive chamadas do Discord — deixando sair apenas o dos programas acima.'
-          : 'Blacklist deixa o som dos programas acima fora da sua transmissão. Eles continuam tocando normalmente para você.'}
+          ? 'Só o som dos programas acima vai na transmissão. Todo o resto fica em silêncio pra quem assiste — inclusive chamadas.'
+          : 'O som dos programas acima não vai na transmissão. Você continua ouvindo tudo normalmente.'}
       </p>
 
       <hr className="divider" />
@@ -175,11 +169,10 @@ export default function ConnectionTab({
         }}
       >
         <span className={`switch ${preferencias.aceleracaoDeHardware ? 'on' : ''}`} />
-        Aceleração por hardware (GPU)
+        Usar a placa de vídeo
       </label>
       <p className="hint">
-        Ligada, a placa de vídeo faz o trabalho pesado. Desligue se o driver de vídeo
-        travar.
+        Deixa o app mais leve. Desligue só se a imagem travar ou a tela piscar.
       </p>
 
       <hr className="divider" />

@@ -15,9 +15,9 @@ export default function AvisoServidor() {
     <div className="aviso-servidor" role="note">
       <strong>Entre só em servidor de confiança</strong>
       <p>
-        Sua tela e seu áudio podem passar pelo servidor quando a conexão direta
-        entre vocês não fecha. Quem opera a máquina consegue gravar o que passa
-        por ela.
+        Quando vocês não conseguem se conectar direto, sua tela e seu som passam
+        pelo servidor. Quem controla esse servidor consegue gravar o que passa
+        por ele.
       </p>
     </div>
   );
