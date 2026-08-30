@@ -1,0 +1,39 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+
+    // O Vite compila cada arquivo isolado, sem olhar os outros. Estas duas
+    // marcas fazem o compilador recusar o que o Vite nao saberia resolver -
+    // melhor o erro aparecer aqui do que virar comportamento estranho em
+    // producao.
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+
+    // Nada de emitir: quem gera o bundle e o Vite. O tsc aqui so confere.
+    "noEmit": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "allowJs": true,
+
+    // O ponto de converter para TypeScript e este bloco. Sem strict, o
+    // compilador aceita quase tudo e a conversao vira so trocar a extensao.
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+
+    // Avisa sobre o que sobrou de um refactor em vez de deixar acumular.
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src", "electron/types.d.ts", "vite.config.ts"]
+}

@@ -1,0 +1,127 @@
+{
+  "name": "greenlabs",
+  "productName": "GreenLabs",
+  "version": "0.4.1",
+  "description": "GreenLabs Live Streaming Engine",
+  "author": {
+    "name": "GreenLabs",
+    "email": "gustavo.c.raichardt@gmail.com"
+  },
+  "private": true,
+  "desktopName": "greenlabs.desktop",
+  "type": "module",
+  "main": "electron/dist/main.js",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "electron": "npm run build:main && electron .",
+    "app": "npm run build:main && concurrently -k \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
+    "build": "npm run build:main && vite build",
+    "build:exe": "npm run build && electron-builder --win nsis --x64",
+    "build:linux": "npm run build && electron-builder --linux --x64 -c.directories.output=dist-installer",
+    "build:installer": "npm run build && electron-builder --win nsis --x64 -c.directories.output=dist-installer",
+    "build:dir": "npm run build && electron-builder --dir --win --x64",
+    "preview": "vite preview --host 0.0.0.0",
+    "build:main": "tsc -p electron/tsconfig.json && node -e \"require('fs').writeFileSync('electron/dist/package.json','{\\\"type\\\":\\\"commonjs\\\"}')\"",
+    "typecheck": "tsc --noEmit && tsc -p electron/tsconfig.json --noEmit"
+  },
+  "build": {
+    "appId": "com.greenlabs.call",
+    "productName": "GreenLabs",
+    "asar": true,
+    "compression": "maximum",
+    "directories": {
+      "output": "dist-app"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/dist/**/*",
+      "electron/*.ps1",
+      "electron/*.exe",
+      "electron/icon.png",
+      "index.html",
+      "logo.png",
+      "package.json"
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "GreenLabs-Setup-${version}.${ext}"
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "category": "AudioVideo",
+      "target": [
+        {
+          "target": "tar.gz",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "GreenLabs-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "GreenLabs",
+      "runAfterFinish": true,
+      "artifactName": "GreenLabs-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "GreenLabs-${version}-portable.${ext}"
+    },
+    "asarUnpack": [
+      "server/**/*",
+      "electron/AudioCapture.exe",
+      "electron/greenlabs-signaling.exe",
+      "node_modules/ws/**/*"
+    ]
+  },
+  "dependencies": {
+    "react": "latest",
+    "react-dom": "latest",
+    "ws": "latest",
+    "zod": "^4.5.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "latest",
+    "concurrently": "latest",
+    "electron": "latest",
+    "electron-builder": "latest",
+    "typescript": "^7.0.2",
+    "vite": "latest",
+    "wait-on": "latest"
+  }
+}

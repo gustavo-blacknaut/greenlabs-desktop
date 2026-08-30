@@ -1,0 +1,4 @@
+{
+  "//": "O processo principal do Electron e CommonJS, ao contrario da interface, que e ESM pelo Vite. O TypeScript decide o formato pelo package.json mais proximo do arquivo - sem este, ele trata estes .ts como ESM e passa a exigir extensao em cada import.",
+  "type": "commonjs"
+}
