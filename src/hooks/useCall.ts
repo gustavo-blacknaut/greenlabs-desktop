@@ -146,6 +146,26 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
     [enviar],
   );
 
+  /**
+   * Uma m-line livre para enviar uma faixa deste tipo.
+   *
+   * Em modo retransmissor o servidor ja abre as m-lines de publicacao quando a
+   * pessoa entra, e sao elas que devem ser usadas - com replaceTrack, que nao
+   * exige renegociacao. Livre e a que pode enviar e ainda nao tem faixa.
+   *
+   * O tipo vem do receiver: um transceptor sem faixa de envio nao diz de que
+   * tipo ele e por nenhum outro caminho.
+   */
+  const vagaParaEnviar = (pc: RTCPeerConnection, tipo: string) =>
+    pc
+      .getTransceivers()
+      .find(
+        (t) =>
+          !t.sender.track &&
+          (t.direction === 'sendrecv' || t.direction === 'sendonly') &&
+          t.receiver.track?.kind === tipo,
+      );
+
   const oferecer = useCallback(
     async (parId: IdDePar, reiniciarIce = false) => {
       const pc = pares.current.get(parId);
@@ -299,6 +319,20 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
 
       enviar({ type: 'stream-ended', streamId: item.stream.id });
 
+      // Solta a vaga no servidor: sem isto o sender continua apontando para uma
+      // faixa parada, o servidor nao ve a transmissao acabar, e quem assiste
+      // fica com o ultimo quadro congelado ate o tempo sem pacote expirar.
+      if (modoSfu.current) {
+        for (const pc of pares.current.values()) {
+          for (const transceptor of pc.getTransceivers()) {
+            const daFaixa = item.stream
+              .getTracks()
+              .some((faixa) => faixa.id === transceptor.sender.track?.id);
+            if (daFaixa) await transceptor.sender.replaceTrack(null).catch(() => {});
+          }
+        }
+      }
+
       if (item.tipo === 'screen') aoEncerrarTela.current?.();
 
       for (const faixa of item.stream.getTracks()) {
@@ -374,6 +408,20 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
       setAtivaId(item.id);
 
       for (const [parId, pc] of pares.current.entries()) {
+        // Com o servidor retransmitindo, quem negocia e ele: a faixa entra
+        // numa m-line que ja existe, por replaceTrack, e nada precisa ser
+        // reofertado. Oferecer aqui colidia com a renegociacao dele.
+        if (modoSfu.current) {
+          for (const faixa of stream.getTracks()) {
+            const vaga = vagaParaEnviar(pc, faixa.kind);
+            if (!vaga) continue;
+            await vaga.sender.replaceTrack(faixa);
+            if (faixa.kind === 'video') void configurarSender(vaga.sender, qualidade);
+          }
+          enviarMeta(parId, item);
+          continue;
+        }
+
         for (const faixa of stream.getTracks()) {
           const sender = pc.addTrack(faixa, stream);
           if (faixa.kind === 'video') void configurarSender(sender, qualidade);
@@ -524,6 +572,33 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
           }
 
           await pc.setRemoteDescription(mensagem.description);
+
+          // Com o servidor retransmitindo, as m-lines que ele abre para nos
+          // PUBLICARMOS ficam marcadas como "podemos enviar" ja na resposta,
+          // mesmo sem faixa nenhuma ainda.
+          //
+          // E o que permite comecar a transmitir depois com replaceTrack, sem
+          // renegociar. Renegociar do nosso lado enquanto o servidor renegocia
+          // do dele e colisao, e o resultado e o papel do DTLS virando no meio
+          // da conexao: "Failed to set SSL role for the transport", e a tela
+          // nao aparecia para ninguem.
+          //
+          // As m-lines das faixas dos OUTROS ficam de fora: elas sao recvonly
+          // para nos, e dizer que enviamos nelas seria mentira.
+          if (modoSfu.current) {
+            for (const transceptor of pc.getTransceivers()) {
+              if (transceptor.direction === 'sendonly' ||
+                  transceptor.direction === 'inactive') {
+                try {
+                  transceptor.direction = 'sendrecv';
+                } catch {
+                  // Navegador que nao deixa mexer na direcao: sobra o caminho
+                  // antigo, com renegociacao.
+                }
+              }
+            }
+          }
+
           const resposta = await pc.createAnswer();
           await pc.setLocalDescription(resposta);
 
