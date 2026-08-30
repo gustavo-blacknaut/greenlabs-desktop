@@ -7,7 +7,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import AvisoServidor from '@/components/AvisoServidor';
 import CameraPicker from '@/components/CameraPicker';
 import ConfigModal from '@/components/config/ConfigModal';
 import Onboarding from '@/components/Onboarding';
@@ -367,7 +366,6 @@ export default function App() {
           })}
         </nav>
 
-        {!chamada.conectado && <AvisoServidor />}
       </section>
     </main>
   );
