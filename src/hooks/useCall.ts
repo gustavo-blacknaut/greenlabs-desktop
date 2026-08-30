@@ -585,16 +585,24 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
           //
           // As m-lines das faixas dos OUTROS ficam de fora: elas sao recvonly
           // para nos, e dizer que enviamos nelas seria mentira.
+          //
+          // Quais sao as nossas: as PRIMEIRAS de cada tipo. O servidor abre uma
+          // de video e uma de audio para a pessoa publicar assim que ela entra,
+          // e so depois vem as das faixas dos outros. Escolher pela direcao nao
+          // funciona - a m-line de publicacao pode chegar aqui como `recvonly`,
+          // e era justamente esse caso que a primeira versao desta correcao
+          // pulava, deixando o cliente sem publicar nada.
           if (modoSfu.current) {
+            const jaMarcado = new Set<string>();
             for (const transceptor of pc.getTransceivers()) {
-              if (transceptor.direction === 'sendonly' ||
-                  transceptor.direction === 'inactive') {
-                try {
-                  transceptor.direction = 'sendrecv';
-                } catch {
-                  // Navegador que nao deixa mexer na direcao: sobra o caminho
-                  // antigo, com renegociacao.
-                }
+              const tipo = transceptor.receiver.track?.kind;
+              if (!tipo || jaMarcado.has(tipo)) continue;
+              jaMarcado.add(tipo);
+              try {
+                transceptor.direction = 'sendrecv';
+              } catch {
+                // Navegador que nao deixa mexer na direcao: sobra o caminho
+                // antigo, com renegociacao.
               }
             }
           }
