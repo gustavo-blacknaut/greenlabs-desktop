@@ -98,4 +98,20 @@ function configurarChromium(): void {
   app.commandLine.appendSwitch('enable-gpu-rasterization');
   app.commandLine.appendSwitch('enable-zero-copy');
   app.commandLine.appendSwitch('ignore-gpu-blocklist');
+
+  // Fora a moldura em volta do que esta sendo transmitido.
+  //
+  // No Windows o Chromium captura por Windows.Graphics.Capture, e o WGC desenha
+  // uma borda colorida em volta da tela ou da janela capturada - o sistema
+  // avisando "isto aqui esta sendo gravado". A intencao e boa e num navegador
+  // faz sentido, mas aqui a moldura entra na propria imagem transmitida: quem
+  // assiste ve a borda, e quem transmite ve a tela inteira contornada o tempo
+  // todo.
+  //
+  // Desligado, o Chromium volta ao capturador anterior, que nao desenha nada. E
+  // o mesmo caminho que o cliente nativo usa - Desktop Duplication direto.
+  app.commandLine.appendSwitch(
+    'disable-features',
+    'WebRtcAllowWgcScreenCapturer,WebRtcAllowWgcWindowCapturer',
+  );
 }
