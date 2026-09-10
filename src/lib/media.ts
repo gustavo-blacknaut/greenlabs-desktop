@@ -40,10 +40,20 @@ export function qualidadePorId(id: string): PerfilDeQualidade {
 /**
  * Aplica o perfil de qualidade no sender de video.
  *
- * `degradationPreference` decide o que sacrificar quando a rede aperta: em 60
- * fps o movimento e o que importa (jogo), em 30 a nitidez (apresentacao,
- * codigo na tela). Escolher errado aqui e a diferenca entre uma tela borrada e
- * uma tela travada.
+ * `degradationPreference` decide o que sacrificar quando o encoder ou a rede
+ * nao dao conta, e a escolha aqui era pela taxa pedida: 30 fps ganhava
+ * `maintain-resolution`, para nitidez de apresentacao e codigo na tela.
+ *
+ * Errado, e o motivo e medido. maintain-resolution manda o navegador NUNCA
+ * encolher a imagem - quando falta CPU, ele derruba quadro. Codificar 1080p em
+ * software custa 101 ms por quadro, o que poe o teto em ~10 fps; o que saiu
+ * foi 1920x1080 a 6 fps, uma sequencia de fotos. E nao ha perda de pacote
+ * nenhuma no caminho: a imagem simplesmente nao chega a ser produzida, entao
+ * procurar o defeito na rede nao leva a lugar nenhum.
+ *
+ * `balanced` deixa o navegador encolher a resolucao e manter o movimento. Uma
+ * tela menor e fluida se le melhor do que uma tela cheia que anda de dois em
+ * dois segundos.
  */
 export async function configurarSender(
   sender: RTCRtpSender | null | undefined,
@@ -53,8 +63,7 @@ export async function configurarSender(
 
   try {
     const parametros = sender.getParameters();
-    parametros.degradationPreference =
-      qualidade.fps >= 45 ? 'maintain-framerate' : 'maintain-resolution';
+    parametros.degradationPreference = 'balanced';
 
     if (!parametros.encodings?.length) parametros.encodings = [{}];
     const primeira = parametros.encodings[0]!;
