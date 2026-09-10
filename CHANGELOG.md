@@ -3,12 +3,12 @@
 Todas as mudanças notáveis do app desktop, por versão. Formato livre, em
 português, ligado aos [releases do GitHub](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases).
 
-## [0.3.4](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.3.4) — 2026-08-26
+## [0.3.4](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.3.4) - 2026-08-26
 
 Uma correção só, e ela vale por muita coisa.
 
 **Transmissão que não aparecia.** Quando alguém transmitia, o vídeo chegava
-aqui, a conexão ficava de pé, os quadros passavam — e o app mostrava "Nenhuma
+aqui, a conexão ficava de pé, os quadros passavam - e o app mostrava "Nenhuma
 transmissão ativa". Sem erro em lugar nenhum.
 
 A causa: ao receber uma faixa de vídeo, o app fazia
@@ -18,7 +18,7 @@ const stream = event.streams[0];
 if (!stream) return;
 ```
 
-Nem toda faixa vem com uma `MediaStream` associada — isso depende de o outro
+Nem toda faixa vem com uma `MediaStream` associada - isso depende de o outro
 lado ter declarado `msid` no SDP. Quando não vinha, a faixa era descartada em
 silêncio. Agora, quando não vem, o app monta uma.
 
@@ -28,13 +28,13 @@ que está em desenvolvimento, mas atingiria qualquer emissor que não declarasse
 
 O app Android tem a mesma correção, já que ele carrega este mesmo cliente.
 
-## [0.3.3](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.3.3) — 2026-08-25
+## [0.3.3](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.3.3) - 2026-08-25
 
 **O servidor de sinalização agora vai compilado dentro do app.** Quando você
 hospeda pelo GreenLabs, quem atende é o
 [servidor em Go](https://github.com/gustavo-blacknaut/greenlabs-server),
 um executável de 7 MB que vem junto na instalação. Não precisa instalar Go, nem
-Node, nem contratar hospedagem — é só clicar em hospedar.
+Node, nem contratar hospedagem - é só clicar em hospedar.
 
 A diferença que importa não é velocidade, é onde ele roda. Antes a sinalização
 rodava **dentro do processo principal do Electron**, dividindo o mesmo event
@@ -60,7 +60,7 @@ Detalhes:
 - O processo é encerrado junto com o app, e o servidor em Node continua como
   reserva caso o binário não esteja junto.
 
-## [0.3.2](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.3.2) — 2026-08-25
+## [0.3.2](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.3.2) - 2026-08-25
 
 A 0.3.0 travava assim que a tela era aberta. Como não deu para reproduzir o
 crash aqui, o caminho foi outro: em vez de continuar chutando, os arquivos que
@@ -84,13 +84,13 @@ O que **não** mudou em relação à 0.2.5: o `setDisplayMediaRequestHandler`, a
 sete flags de GPU e a duplicação de área de trabalho (DXGI). Isso continua
 intocado.
 
-A 0.3.1 tinha as duas primeiras correções, mas ficou só como build local — não
+A 0.3.1 tinha as duas primeiras correções, mas ficou só como build local - não
 chegou a ser publicada.
 
-## [0.3.0](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.3.0) — 2026-08-25
+## [0.3.0](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.3.0) - 2026-08-25
 
 Parte da 0.2.5, que é a versão que funcionava, e corrige dois defeitos que
-**já existiam nela** — não vieram das versões 0.2.7/0.2.8, que foram removidas.
+**já existiam nela** - não vieram das versões 0.2.7/0.2.8, que foram removidas.
 
 - **O app fechava sozinho.** O registro de eventos do Windows mostrava o
   `AudioCapture.exe` morrendo com uma exceção não tratada em
@@ -98,7 +98,7 @@ Parte da 0.2.5, que é a versão que funcionava, e corrige dois defeitos que
   porque um capturador de uma execução anterior ainda a segurava, e a exceção
   derrubava o processo inteiro.
 
-  Essa porta não tem a ver com hospedar nada — é o cano interno por onde o
+  Essa porta não tem a ver com hospedar nada - é o cano interno por onde o
   capturador entrega o áudio ao app, e sobe mesmo quando você só assiste.
 
   Agora o app encerra qualquer capturador esquecido antes de subir o seu e ao
@@ -110,7 +110,7 @@ Parte da 0.2.5, que é a versão que funcionava, e corrige dois defeitos que
 
 - **O botão de desligar a aceleração por hardware não fazia nada.** Ele chamava
   `disableHardwareAcceleration()` quando clicado, mas o Electron só aceita essa
-  chamada antes do app ficar pronto — depois disso é ignorada. A preferência
+  chamada antes do app ficar pronto - depois disso é ignorada. A preferência
   agora fica gravada em disco e é lida na inicialização, com um aviso para
   reiniciar e um botão que reinicia na hora.
 
@@ -121,7 +121,7 @@ Parte da 0.2.5, que é a versão que funcionava, e corrige dois defeitos que
 
 As flags de GPU continuam exatamente as sete da 0.2.5.
 
-## [0.2.9](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.2.9) — 2026-08-25
+## [0.2.9](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.2.9) - 2026-08-25
 
 **Volta o subsistema de áudio para exatamente o da 0.2.5.** As versões 0.2.7 e
 0.2.8 travavam o PC, paravam o áudio do resto do sistema e no fim derrubavam o
@@ -129,8 +129,8 @@ app. Ambas foram removidas do GitHub.
 
 A causa foi uma "correção" que eu introduzi na 0.2.7. Para impedir que o
 capturador excluísse a si mesmo, ele passou a montar a árvore do próprio
-processo e ignorá-la. Só que essa árvore subia até o topo — chegando no
-`explorer.exe` — e depois descia pegando todos os filhos. Como quase tudo que
+processo e ignorá-la. Só que essa árvore subia até o topo - chegando no
+`explorer.exe` - e depois descia pegando todos os filhos. Como quase tudo que
 a pessoa abre é filho do Explorer, **o Discord acabava dentro da "própria
 árvore"** e nunca era excluído. Junto disso, cada conexão ao áudio passou a
 disparar duas consultas WMI e um reinício do processo de captura, o que
@@ -140,16 +140,16 @@ O arquivo de captura, o processo principal e o cliente voltaram byte a byte ao
 estado da 0.2.5. Verificado depois de recompilar: volta a encontrar o Discord
 e a excluir a árvore certa.
 
-As correções da 0.2.7 que dependiam desse caminho foram desfeitas junto —
+As correções da 0.2.7 que dependiam desse caminho foram desfeitas junto -
 prefiro reintroduzir uma de cada vez, testando, do que manter algo que trava a
 máquina.
 
-## [0.2.8](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.2.8) — removida
+## [0.2.8](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.2.8) - removida
 
 **Reverte a mudança da 0.2.7 que quebrou o compartilhamento de tela.** Aquela
 versão trocou o `audio: 'loopback'` do handler de captura do Electron por um
 `undefined`, para não pedir o som do sistema. O efeito colateral foi o app
-travar e não transmitir nada — a 0.2.7 foi removida do GitHub.
+travar e não transmitir nada - a 0.2.7 foi removida do GitHub.
 
 O `loopback` está de volta e não deve mais sair dali. Ele parece contraditório
 (é "todo o som do sistema, Discord incluído"), mas essa faixa **nunca é
@@ -159,22 +159,22 @@ Tirar o `loopback` não melhora nada e quebra a captura.
 
 As demais correções da 0.2.7 continuam valendo (a lista abaixo).
 
-## [0.2.7](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.2.7) — removida
+## [0.2.7](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.2.7) - removida
 
 Quatro defeitos no áudio, todos localizados no código antes de qualquer correção:
 
 - **O app podia excluir a si mesmo em vez do Discord.** O modo EXCLUDE do
   WASAPI aceita uma árvore de processos por vez, e o alvo era escolhido a
-  partir de um `HashSet` — cuja ordem muda entre execuções. Com `electron` e
+  partir de um `HashSet` - cuja ordem muda entre execuções. Com `electron` e
   `greenlabs` na lista, o capturador às vezes elegia a própria árvore, e o som
   do Discord passava direto. Agora a árvore do capturador nunca é candidata, e
   a escolha é ordenada: mesma situação, mesmo resultado.
 - **O áudio virava um segundo card, rotulado como câmera.** Ao anexar a faixa
   de áudio, o app criava uma `MediaStream` nova. Como o id mudava, o outro lado
-  via um stream desconhecido e abria outro card — sem vídeo, então classificado
+  via um stream desconhecido e abria outro card - sem vídeo, então classificado
   como câmera. A faixa agora entra na mesma stream já publicada.
 - **O Electron entregava o som do sistema inteiro.** O handler de captura
-  concedia `audio: 'loopback'`, que inclui o Discord — exatamente o que este
+  concedia `audio: 'loopback'`, que inclui o Discord - exatamente o que este
   app existe para evitar. O áudio da transmissão vem só do capturador por
   processo.
 - **A tela de configuração de áudio não fazia nada.** A lista de programas era
@@ -188,7 +188,7 @@ Também:
   qualidade.
 - **Removido o sistema antigo de mute** (`mute-audio.ps1`), que silenciava os
   aplicativos no mixer do Windows. Ele tirava o som do Discord da própria
-  pessoa — o oposto do objetivo — e continuava no código sem uso.
+  pessoa - o oposto do objetivo - e continuava no código sem uso.
 - **Removida a opção "whitelist"** da configuração: ela prometia mutar o
   Windows inteiro, comportamento do sistema que saiu.
 
@@ -198,14 +198,14 @@ Também:
 > o que mora aqui é a metade web dessas correções, já que o app embute o mesmo
 > cliente React. Corrigido a partir da 0.2.5.
 
-## [0.2.5](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.2.5) — 2026-08-24
+## [0.2.5](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.2.5) - 2026-08-24
 
 - **Tráfego de sinalização reduzido em até 23x.** Cada ping de cada
-  participante disparava um broadcast para a sala inteira — n pings por
+  participante disparava um broadcast para a sala inteira - n pings por
   segundo vezes n destinatários, ou seja, tráfego crescendo com o *quadrado*
   do tamanho da sala. Medido: 30 participantes geravam ~8 Mbps só de
   atualização de ping. Agora os broadcasts são agrupados em um por segundo por
-  sala — o resultado para quem usa é o mesmo, já que os clientes só pingam
+  sala - o resultado para quem usa é o mesmo, já que os clientes só pingam
   nessa frequência.
 
   | Participantes | Antes | Depois |
@@ -218,16 +218,16 @@ Também:
 - **`main.jsx` dividido em módulos.** Eram 2140 linhas num arquivo só,
   misturando ícones, helpers, a ponte do Android e a lógica da chamada. Agora
   são `icons.jsx`, `lib/media.js`, `lib/format.js`, `lib/wasapi-audio.js` e
-  `lib/android-screen.js` — este último isolando o código que só existe para o
+  `lib/android-screen.js` - este último isolando o código que só existe para o
   app Android e que antes ficava enterrado no meio do cliente desktop.
 - **Requisitos mínimos corrigidos no README.** A tabela anterior pedia até
   4 GB de RAM para 30 participantes. Era estimativa, não medição, e estava
   errada por uma ordem de grandeza: medido, o servidor usa **56 MB** com 30
-  participantes — cerca de 7 MB acima do processo ocioso.
+  participantes - cerca de 7 MB acima do processo ocioso.
 - README atualizado: o app Android **transmite tela** desde a v1.0.3 (até
   720p/15fps, via `MediaProjection` nativo), com link para o repositório.
 
-## [0.2.4](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.2.4) — 2026-08-24
+## [0.2.4](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.2.4) - 2026-08-24
 
 - Metade web do ajuste de layout para celular: barra de ações no rodapé
   (transmitir tela, câmera, configuração, entrar/sair), alvos de toque maiores
@@ -235,13 +235,13 @@ Também:
   o layout não correr por baixo das barras do sistema. O layout de desktop não
   muda.
 
-## [0.2.3](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.2.3) — 2026-08-24
+## [0.2.3](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.2.3) - 2026-08-24
 
-- **Áudio sumiu de novo na 0.2.2 — regressão minha, corrigida.** Ao apertar
+- **Áudio sumiu de novo na 0.2.2 - regressão minha, corrigida.** Ao apertar
   o buffer para reduzir o delay, a margem de descarte ficou em 40ms, abaixo
   do tamanho natural das rajadas em que o áudio chega (o leitor HTTP acorda
   com um bloco, não com uma amostra de cada vez). Resultado medido: contra
-  rajadas de 60ms, **só 66% do áudio tocava** — um terço era descartado no
+  rajadas de 60ms, **só 66% do áudio tocava** - um terço era descartado no
   instante em que chegava, e a saída ficava com buracos de silêncio.
   Agora a margem parte de 40ms mas cresce sozinha até o dobro da maior
   rajada observada: medido em 98–99% de aproveitamento com rajadas de 10ms,
@@ -253,10 +253,10 @@ Também:
   a seção ativa ocupa a tela inteira (medido: 638px em vez de 309px). O
   layout de desktop não muda.
 
-## [0.2.2](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.2.2) — 2026-08-24
+## [0.2.2](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.2.2) - 2026-08-24
 
 - **Delay do áudio da tela reduzido.** Com o áudio realmente chegando no
-  remoto (fix da 0.2.1), o delay residual ficou perceptível — o buffer do
+  remoto (fix da 0.2.1), o delay residual ficou perceptível - o buffer do
   `AudioWorklet` no navegador foi de 200ms/100ms de margem para 120ms/40ms.
 - **Compartilhar tela "teleportando" no Android.** Os frames JPEG chegavam
   em rajadas e eram desenhados assim que decodificados; se várias chegassem
@@ -268,11 +268,11 @@ Também:
 - **Transmissão caía e o app continuava dizendo que estava transmitindo.**
   Se a conexão com o stream de tela morresse no meio (rede, serviço
   encerrado), o erro era engolido silenciosamente e a UI nunca era
-  avisada. Agora qualquer queda encerra a faixa de vídeo de verdade — o
-  que já limpa o card na tela sozinho — e mostra um aviso.
+  avisada. Agora qualquer queda encerra a faixa de vídeo de verdade - o
+  que já limpa o card na tela sozinho - e mostra um aviso.
 - **Insets do Android não aplicavam no primeiro carregamento.** O listener
   de `WindowInsets` era registrado depois de `setContentView()`, perdendo o
-  único despacho automático que acontece nesse momento — o padding do topo
+  único despacho automático que acontece nesse momento - o padding do topo
   só aparecia depois de algum evento novo (rotação, teclado). Corrigido
   forçando um novo despacho (`requestApplyInsets`) logo após registrar o
   listener.
@@ -280,30 +280,30 @@ Também:
   transmissão" e "Sair da chamada", direto da notificação, sem precisar
   voltar pro app.
 
-## [0.2.1](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.2.1) — 2026-08-24
+## [0.2.1](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.2.1) - 2026-08-24
 
 Dois bugs que só ficaram visíveis depois que o áudio da tela voltou a
 funcionar (0.2.0 corrigiu a captura, mas a entrega tinha outro problema):
 
 - **Áudio da tela nunca chegava no remoto.** `pc.addTrack(audioTrack, ...)`
   rodava sem renegociar a conexão depois. A faixa era enviada de verdade,
-  só que o outro lado nunca ficava sabendo que ela existia — corrigido com
+  só que o outro lado nunca ficava sabendo que ela existia - corrigido com
   `makeOffer(peerId)` após o `addTrack`.
 - **`setShareError` nunca existiu.** Toda mensagem de erro de câmera ou
   tela, desde sempre, lançava `ReferenceError` e sumia sem avisar ninguém.
   Declarado o estado que faltava, com um aviso de verdade na tela.
 
-## [0.2.0](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.2.0) — 2026-08-24
+## [0.2.0](https://github.com/gustavo-blacknaut/greenlabs-desktop/releases/tag/v0.2.0) - 2026-08-24
 
 - **Delay de ~1-2s no áudio sem Discord, corrigido.** O buffer do WASAPI
-  pedia 5 segundos (sobra de um teste antigo) — reduzido para 200ms. O
+  pedia 5 segundos (sobra de um teste antigo) - reduzido para 200ms. O
   pipeline no navegador trocou de `ScriptProcessorNode` (thread principal,
   vulnerável a travadas de UI) para `AudioWorkletNode` (thread dedicada de
   áudio), que não sofre com isso.
 - **Compartilhar tela no Android.** Nenhum navegador Android implementa
   `getDisplayMedia`; o app mobile captura via `MediaProjection` nativo e
   entrega os frames por HTTP local, que viram uma `MediaStream` de verdade
-  via `canvas.captureStream()` — reaproveita o mesmo caminho de código que
+  via `canvas.captureStream()` - reaproveita o mesmo caminho de código que
   uma câmera já usava.
 - **Site publicado por GitHub Pages**, com HTTPS (exigido pelo
   `getDisplayMedia`) e documentação de onde compartilhar tela funciona.
@@ -316,10 +316,10 @@ funcionar (0.2.0 corrigiu a captura, mas a entrega tinha outro problema):
 - Corrigido um bloco de instruções de hospedagem que tinha ficado
   duplicado por um patch anterior.
 
-## 0.1.1 — primeira versão publicada no GitHub (sem release dedicado)
+## 0.1.1 - primeira versão publicada no GitHub (sem release dedicado)
 
 - **Captura de áudio por processo via WASAPI** (modo *exclude*): transmite
-  o som do sistema sem o Discord, sem mutar nada localmente — você continua
+  o som do sistema sem o Discord, sem mutar nada localmente - você continua
   ouvindo normal, só quem entra na chamada não escuta o Discord.
 - **Hospedagem do servidor direto pela interface do app** (aba
   Hospedar/Configuração), sem precisar de Node instalado nem terminal.

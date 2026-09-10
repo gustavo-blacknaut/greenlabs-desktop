@@ -4,7 +4,7 @@
 
 # GreenLabs
 
-**Mostre sua tela com o som do jogo — e sem o Discord junto.**
+**Mostre sua tela com o som do jogo - e sem o Discord junto.**
 
 Sem conta, sem limite de tempo, sem servidor de ninguém no meio.
 
@@ -22,17 +22,17 @@ Sem conta, sem limite de tempo, sem servidor de ninguém no meio.
 ## O que ele faz
 
 **Transmite o som do sistema menos um aplicativo.** O jogo, o Spotify e o
-navegador vão junto com a imagem; o Discord fica de fora — sem ser silenciado
+navegador vão junto com a imagem; o Discord fica de fora - sem ser silenciado
 para você. Quem está na chamada ouve o jogo, não a conversa.
 
 **Mostra a tela de todo mundo.** Cada pessoa transmitindo ganha um cartão com
 miniatura ao vivo; um clique põe a dela em destaque.
 
-**Câmera, se você quiser.** Só a imagem — o microfone da webcam não vai junto.
+**Câmera, se você quiser.** Só a imagem - o microfone da webcam não vai junto.
 
 **Ninguém no meio.** O vídeo e o áudio vão direto entre os participantes
 (WebRTC P2P). Cada pessoa hospeda o próprio servidor, e ele só serve para as
-pessoas se encontrarem — não existe servidor central.
+pessoas se encontrarem - não existe servidor central.
 
 ## Como usar
 
@@ -41,7 +41,7 @@ pessoas se encontrarem — não existe servidor central.
 3. **Entrar** e depois **Transmitir**.
 
 Não tem servidor? O [GreenLabs Server](https://github.com/gustavo-blacknaut/greenlabs-server)
-sobe com um comando — ou dá para hospedar pelo próprio aplicativo, na aba
+sobe com um comando - ou dá para hospedar pelo próprio aplicativo, na aba
 Hospedar.
 
 ## Outros jeitos de entrar
@@ -49,7 +49,7 @@ Hospedar.
 | | |
 | --- | --- |
 | [greenlabs-windows](https://github.com/gustavo-blacknaut/greenlabs-windows) | Cliente nativo em C++: 3,8 MB, sem Chromium, mais leve |
-| [greenlabs-android](https://github.com/gustavo-blacknaut/greenlabs-android) | No celular — assistir, aparecer e mostrar a tela |
+| [greenlabs-android](https://github.com/gustavo-blacknaut/greenlabs-android) | No celular - assistir, aparecer e mostrar a tela |
 | [greenlabs-site](https://github.com/gustavo-blacknaut/greenlabs-site) | Pelo navegador, sem baixar nada |
 | [greenlabs-server](https://github.com/gustavo-blacknaut/greenlabs-server) | O servidor, um binário só |
 
@@ -63,11 +63,11 @@ Hospedar.
 - [Versão web (site)](#versão-web-site)
 - [Compartilhar tela: onde funciona](#compartilhar-tela-onde-funciona)
 - [Hospedando o servidor](#hospedando-o-servidor)
-  - [Pelo aplicativo (mais simples)](#pelo-aplicativo-mais-simples)
-  - [Pelo terminal](#pelo-terminal)
-  - [Sobre a porta](#sobre-a-porta)
-  - [Guia completo de hospedagem](#guia-completo-de-hospedagem)
-  - [Atualizando um servidor que já estava rodando](#atualizando-um-servidor-que-já-estava-rodando)
+ - [Pelo aplicativo (mais simples)](#pelo-aplicativo-mais-simples)
+ - [Pelo terminal](#pelo-terminal)
+ - [Sobre a porta](#sobre-a-porta)
+ - [Guia completo de hospedagem](#guia-completo-de-hospedagem)
+ - [Atualizando um servidor que já estava rodando](#atualizando-um-servidor-que-já-estava-rodando)
 - [Por que um servidor no Brasil importa](#por-que-um-servidor-no-brasil-importa)
 - [Requisitos mínimos](#requisitos-mínimos)
 - [Desenvolvimento](#desenvolvimento)
@@ -98,7 +98,7 @@ Hospedar.
 
 O servidor de sinalização é leve: ele apenas repassa mensagens de conexão
 (offer/answer/ICE) e mantém a lista de quem está na sala. O tráfego pesado
-— vídeo e áudio — nunca passa por ele.
+- vídeo e áudio - nunca passa por ele.
 
 A captura de áudio usa `AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK` do
 WASAPI em modo *exclude*: capturamos o mix do sistema inteiro **menos** a árvore
@@ -152,7 +152,7 @@ Para ativar no seu fork: **Settings → Pages → Source: GitHub Actions**.
 
 O filtro que remove o Discord depende do WASAPI, que só existe no Windows. No
 navegador o que dá é a caixa nativa "compartilhar áudio", que envia o mix
-inteiro — incluindo o Discord — ou nada.
+inteiro - incluindo o Discord - ou nada.
 
 ### Atenção ao endereço do servidor
 
@@ -164,7 +164,7 @@ Um site em HTTPS **não consegue abrir `ws://`** (mixed content). Então:
 | Site HTTPS | só `wss://` |
 | `http://localhost` (dev) | `ws://` e `wss://` |
 
-Na prática, quem usa o site precisa de um servidor com `wss://` — o jeito mais
+Na prática, quem usa o site precisa de um servidor com `wss://` - o jeito mais
 simples é ligar o túnel na aba **Hospedar**, que já entrega um endereço `wss://`.
 Servidor em rede local por IP só funciona pelo app.
 
@@ -178,11 +178,11 @@ Servidor em rede local por IP só funciona pelo app.
 | **[App Android](https://github.com/gustavo-blacknaut/greenlabs-android)** | ✅ | até 720p 15fps | `MediaProjection` nativo |
 | Chrome/Edge/Firefox desktop (HTTPS) | ✅ | até 1080p 60fps | `getDisplayMedia` disponível |
 | Safari desktop | ✅ | até 1080p 60fps | `getDisplayMedia` disponível |
-| Qualquer navegador em HTTP | ❌ | — | exige secure context |
-| Android pelo navegador | ❌ | — | `getDisplayMedia` não é implementado |
-| iOS / iPadOS Safari | ❌ | — | não implementado |
+| Qualquer navegador em HTTP | ❌ | - | exige secure context |
+| Android pelo navegador | ❌ | - | `getDisplayMedia` não é implementado |
+| iOS / iPadOS Safari | ❌ | - | não implementado |
 
-Nenhum navegador Android implementa `getDisplayMedia` — o
+Nenhum navegador Android implementa `getDisplayMedia` - o
 [caniuse](https://caniuse.com/mdn-api_mediadevices_getdisplaymedia) marca como
 não suportado em Chrome for Android, Android Browser e Samsung Internet. Não é
 limitação do WebView, é da plataforma inteira para conteúdo web.
@@ -195,7 +195,7 @@ WebView por um servidor HTTP local, e o lado web transforma isso numa
 A resolução é menor que no desktop de propósito: os frames são codificados em
 JPEG por software, não por hardware, então 720p/15fps é o limite razoável antes
 do consumo de CPU e bateria ficar alto demais num celular. O Android também
-exige uma notificação persistente enquanto a tela está sendo transmitida — é
+exige uma notificação persistente enquanto a tela está sendo transmitida - é
 política da plataforma, não dá para remover.
 
 ---
@@ -207,7 +207,7 @@ política da plataforma, não dá para remover.
 Abra **Configuração → Hospedar**, escolha a porta, marque **Abrir túnel** se
 quiser acesso pela internet, e clique em **Iniciar servidor**.
 
-O servidor roda dentro do próprio GreenLabs — não precisa de terminal, nem de
+O servidor roda dentro do próprio GreenLabs - não precisa de terminal, nem de
 Node, nem de Go instalado. Quem atende é o
 [servidor em Go](https://github.com/gustavo-blacknaut/greenlabs-server),
 um executável de 7 MB que vem junto na instalação, em processo separado do app.
@@ -228,7 +228,7 @@ Clicar em **Parar servidor** encerra tudo e libera a porta.
 
 ### Pelo terminal
 
-Para hospedar sem abrir a interface — em uma VPS, por exemplo — use o servidor
+Para hospedar sem abrir a interface - em uma VPS, por exemplo - use o servidor
 em Go, que e o unico servidor do GreenLabs:
 
 **→ [github.com/gustavo-blacknaut/greenlabs-server](https://github.com/gustavo-blacknaut/greenlabs-server)**
@@ -242,11 +242,11 @@ Ele sobe e lista os endereços que você pode compartilhar:
 ```
 
 Quem for entrar cola esse endereço no campo **Servidor** do GreenLabs. Pode
-digitar com ou sem `ws://` — o app normaliza sozinho.
+digitar com ou sem `ws://` - o app normaliza sozinho.
 
 ### Sobre a porta
 
-A porta `25640` é só o padrão do projeto — não tem nada de especial nela.
+A porta `25640` é só o padrão do projeto - não tem nada de especial nela.
 **Use a porta que estiver aberta na sua hospedagem.** Qualquer porta livre acima
 de 1024 serve.
 
@@ -261,7 +261,7 @@ PORT=30000 greenlabs-server
 ```
 
 Quem entra precisa usar a mesma porta no endereço (`ws://SEU_IP:30000`). Ao usar
-túnel, a porta não aparece no endereço público — o cloudflared/ngrok cuida disso.
+túnel, a porta não aparece no endereço público - o cloudflared/ngrok cuida disso.
 
 ### Guia completo de hospedagem
 
@@ -312,7 +312,7 @@ Compatibilidade entre versões:
 | Cliente antigo + servidor novo | conecta normal; o ping dos outros aparece como 0 |
 | Cliente novo + servidor antigo | conecta normal; ping dos outros continua errado |
 
-Ou seja, dá para atualizar servidor e clientes em qualquer ordem — nada quebra,
+Ou seja, dá para atualizar servidor e clientes em qualquer ordem - nada quebra,
 só o ping dos participantes fica impreciso até os dois lados estarem atualizados.
 
 Verificando se um servidor está no ar (funciona com qualquer método acima):
@@ -346,7 +346,7 @@ Recomendações:
   Locaweb e KingHost).
 - **Melhor ainda: hospede na sua própria máquina** com Radmin VPN, se todos
   estiverem no Brasil. Sem intermediário, é o menor ping possível.
-- Evite hospedar fora do país se o grupo é todo brasileiro — o ganho de
+- Evite hospedar fora do país se o grupo é todo brasileiro - o ganho de
   "estabilidade" não compensa 150 ms a mais em cada conexão.
 
 ---
@@ -355,7 +355,7 @@ Recomendações:
 
 ### Máquina de quem hospeda o servidor
 
-O servidor de sinalização é **muito** leve — o gargalo é a banda de upload de
+O servidor de sinalização é **muito** leve - o gargalo é a banda de upload de
 quem transmite, não o servidor.
 
 Números medidos rodando o servidor de verdade e conectando N participantes que
@@ -364,7 +364,7 @@ memória, bytes contados no socket para a banda):
 
 | Participantes | RAM (RSS) | Banda de sinalização |
 |---|---|---|
-| ocioso, ninguém conectado | 49 MB | — |
+| ocioso, ninguém conectado | 49 MB | - |
 | 4 | 50 MB | 9 kbps |
 | 8 | 51 MB | 30 kbps |
 | 16 | 51 MB | 103 kbps |
@@ -372,7 +372,7 @@ memória, bytes contados no socket para a banda):
 
 Quase toda essa memória é o próprio runtime do Node: 30 participantes custam
 cerca de **7 MB acima do servidor vazio**. Um core basta em qualquer um desses
-cenários — o processo fica ocioso a maior parte do tempo, só repassando
+cenários - o processo fica ocioso a maior parte do tempo, só repassando
 mensagens pequenas.
 
 > Uma versão anterior deste README trazia uma tabela pedindo até 4 GB de RAM
@@ -493,7 +493,7 @@ contornar isso; se persistir, desative a aceleração por hardware em
 
 **"Ping alto" mas o vídeo está bom**
 O ping mostrado é até o servidor de sinalização, não entre os participantes.
-Um ping alto ali indica servidor distante — veja
+Um ping alto ali indica servidor distante - veja
 [Por que um servidor no Brasil importa](#por-que-um-servidor-no-brasil-importa).
 
 **Ninguém consegue entrar no meu servidor**
@@ -511,13 +511,13 @@ O que mudou em cada versão está no [CHANGELOG.md](CHANGELOG.md).
 A captura de áudio por processo tomou como referência o
 [win-capture-audio](https://github.com/bozbez/win-capture-audio) e o
 [exemplo oficial de Application Loopback](https://github.com/microsoft/Windows-classic-samples/tree/main/Samples/ApplicationLoopback)
-da Microsoft — em especial o formato IEEE float exigido pelo cliente de process
+da Microsoft - em especial o formato IEEE float exigido pelo cliente de process
 loopback e a necessidade de um completion handler *agile*.
 
 ### Projetos relacionados
 
-- [greenlabs-server](https://github.com/gustavo-blacknaut/greenlabs-server) — só o servidor, para hospedar sem baixar o app inteiro
-- [greenlabs-android](https://github.com/gustavo-blacknaut/greenlabs-android) — cliente Android
+- [greenlabs-server](https://github.com/gustavo-blacknaut/greenlabs-server) - só o servidor, para hospedar sem baixar o app inteiro
+- [greenlabs-android](https://github.com/gustavo-blacknaut/greenlabs-android) - cliente Android
 
 ### Stack
 

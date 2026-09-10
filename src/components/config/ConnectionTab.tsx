@@ -154,7 +154,7 @@ export default function ConnectionTab({
 
       <p className="hint">
         {ehWhitelist
-          ? 'Só o som dos programas acima vai na transmissão. Todo o resto fica em silêncio pra quem assiste — inclusive chamadas.'
+          ? 'Só o som dos programas acima vai na transmissão. Todo o resto fica em silêncio pra quem assiste - inclusive chamadas.'
           : 'O som dos programas acima não vai na transmissão. Você continua ouvindo tudo normalmente.'}
       </p>
 

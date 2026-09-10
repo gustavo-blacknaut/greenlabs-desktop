@@ -49,7 +49,7 @@ export function useLocalCapture(chamada: Chamada): UsoDeCaptura {
             qualidade,
             aoCair: (motivo) => setErro(motivo),
           });
-          await chamada.publicar('screen', `Tela — ${qualidade.rotulo}`, stream, qualidade);
+          await chamada.publicar('screen', `Tela - ${qualidade.rotulo}`, stream, qualidade);
         } catch (falha) {
           setErro(`Não foi possível compartilhar a tela: ${mensagemDe(falha)}`);
         }
@@ -78,7 +78,7 @@ export function useLocalCapture(chamada: Chamada): UsoDeCaptura {
       if (!faixaDeVideo) return;
 
       const stream = new MediaStream([faixaDeVideo]);
-      await chamada.publicar('screen', `Tela — ${qualidade.rotulo}`, stream, qualidade);
+      await chamada.publicar('screen', `Tela - ${qualidade.rotulo}`, stream, qualidade);
       if (!comAudio) return;
 
       // O video ja esta no ar; o audio entra quando abrir. Esperar por ele

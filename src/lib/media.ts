@@ -23,7 +23,7 @@ export function novoId(): string {
 }
 
 export const QUALIDADES: readonly PerfilDeQualidade[] = [
-  { id: '480p15', rotulo: '480p 15fps — ultra leve', largura: 854, altura: 480, fps: 15, bitrate: 700_000 },
+  { id: '480p15', rotulo: '480p 15fps - ultra leve', largura: 854, altura: 480, fps: 15, bitrate: 700_000 },
   { id: '480p30', rotulo: '480p 30fps', largura: 854, altura: 480, fps: 30, bitrate: 900_000 },
   { id: '720p30', rotulo: '720p 30fps', largura: 1280, altura: 720, fps: 30, bitrate: 2_200_000 },
   { id: '720p60', rotulo: '720p 60fps', largura: 1280, altura: 720, fps: 60, bitrate: 3_200_000 },

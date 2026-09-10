@@ -56,7 +56,7 @@ export default function HostTab({
       </div>
       <p className="hint">
         Sobe o servidor de sinalização aqui mesmo. Quem for entrar usa um dos endereços
-        abaixo — vídeo e áudio vão direto entre vocês.
+        abaixo - vídeo e áudio vão direto entre vocês.
       </p>
 
       <div className="host-port-row">
@@ -188,7 +188,7 @@ export default function HostTab({
             <div className="host-address highlight">
               <div className="host-address-text">
                 <strong>{enderecoDoTunel}</strong>
-                <span>Internet — via {estado.tunnel}</span>
+                <span>Internet - via {estado.tunnel}</span>
               </div>
               <div className="host-address-actions">
                 <button
@@ -221,7 +221,7 @@ export default function HostTab({
                   <strong>{url}</strong>
                   <span>
                     {item.name}
-                    {item.vpn ? ' — VPN' : ''}
+                    {item.vpn ? ' - VPN' : ''}
                   </span>
                 </div>
                 <div className="host-address-actions">

@@ -246,7 +246,7 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
             ? temVideo
               ? 'Tela'
               : 'Camera'
-            : `${nomeDoPar} — ${temVideo ? 'tela' : 'camera'}`;
+            : `${nomeDoPar} - ${temVideo ? 'tela' : 'camera'}`;
 
           return [
             ...atuais,

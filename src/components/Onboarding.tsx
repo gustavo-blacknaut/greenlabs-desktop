@@ -74,7 +74,7 @@ export default function Onboarding({ aoConcluir }: Props) {
           Pode digitar com ou sem <code>ws://</code>
           {servidor.trim() ? (
             <>
-              {' — vai conectar em '}
+              {' - vai conectar em '}
               <strong>{normalizarServidor(servidor)}</strong>
             </>
           ) : null}
