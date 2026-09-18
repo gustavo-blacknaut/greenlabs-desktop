@@ -60,7 +60,7 @@ export interface Chamada {
     rotulo: string,
     stream: MediaStream,
     qualidade: PerfilDeQualidade,
-  ): Promise<void>;
+  ): Promise<IdDeCartao>;
   encerrar(id: IdDeCartao): Promise<void>;
 
   /**
@@ -95,6 +95,14 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
   const modoSfu = useRef(false);
   const intervaloDePing = useRef<ReturnType<typeof setInterval> | null>(null);
   const ultimoRtt = useRef(0);
+  const candidatosPendentes = useRef(new Map<IdDePar, RTCIceCandidateInit[]>());
+  const dadosDaConexao = useRef<{ servidor: string; sala: string } | null>(null);
+  const desconexaoManual = useRef(false);
+  const tentativasDeReconexao = useRef(0);
+  const timerDeReconexao = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const conectarRef = useRef<(servidor: string, sala: string, reconexao?: boolean) => void>(
+    () => {},
+  );
 
   // O nome muda enquanto a chamada esta de pe. Guardar numa ref evita recriar
   // todos os callbacks a cada tecla digitada no campo de nome.
@@ -145,6 +153,29 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
     },
     [enviar],
   );
+
+  const avisarTodos = useCallback(
+    (mensagem: Omit<Extract<MensagemEnviada, { type: 'stream-ended' }>, 'to'>) => {
+      for (const parId of nomesRemotos.current.keys()) {
+        enviar({ ...mensagem, to: parId });
+      }
+    },
+    [enviar],
+  );
+
+  // ICE pode chegar antes da descricao remota, principalmente em servidor
+  // local. addIceCandidate recusa nessa ordem e o candidato era perdido; em
+  // redes com apenas um caminho viavel isso deixava audio e video parados em
+  // "connecting". Guardamos e aplicamos assim que o SDP existir.
+  const aplicarCandidatosPendentes = useCallback(async (parId: IdDePar, pc: RTCPeerConnection) => {
+    if (!pc.remoteDescription) return;
+    const fila = candidatosPendentes.current.get(parId);
+    if (!fila?.length) return;
+    candidatosPendentes.current.delete(parId);
+    for (const candidato of fila) {
+      await pc.addIceCandidate(candidato).catch(() => {});
+    }
+  }, []);
 
   /**
    * Uma m-line livre para enviar uma faixa deste tipo.
@@ -232,8 +263,14 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
         // `new MediaStream()` sorteia um id novo. Em modo SFU ha renegociacao
         // toda vez que alguem entra ou sai, o ontrack dispara de novo para a
         // mesma faixa, e um id sorteado fazia nascer um cartao a cada vez.
-        const id: IdDeCartao = `${parId}:${evento.streams[0]?.id ?? evento.track.id}`;
-        const meta = metaRemota.current.get(id);
+        const streamId = evento.streams[0]?.id ?? evento.track.id;
+        const id: IdDeCartao = `${parId}:${streamId}`;
+        // No SFU o ontrack vem do participante virtual `sfu`, enquanto a meta
+        // vem da pessoa que publicou. O servidor preserva o streamId; ele e a
+        // chave comum entre os dois caminhos.
+        const meta =
+          metaRemota.current.get(id) ??
+          [...metaRemota.current.entries()].find(([chave]) => chave.endsWith(`:${streamId}`))?.[1];
 
         setTransmissoes((atuais) => {
           if (atuais.some((item) => item.id === id)) return atuais;
@@ -252,7 +289,7 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
             ...atuais,
             {
               id,
-              streamId: stream.id,
+              streamId,
               tipo: meta?.kind ?? (temVideo ? 'screen' : 'camera'),
               nome: meta?.name ?? nomePadrao,
               nomeDoDono: meta?.ownerName ?? (doSfu ? 'Alguem na sala' : nomeDoPar),
@@ -267,6 +304,26 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
         });
 
         setAtivaId((escolhida) => escolhida ?? id);
+
+        const removerCartao = () => {
+          setTransmissoes((atuais) => {
+            const restantes = atuais.filter((item) => item.id !== id);
+            setAtivaId((escolhida) =>
+              escolhida === id ? restantes[0]?.id ?? null : escolhida,
+            );
+            return restantes;
+          });
+        };
+        evento.track.addEventListener(
+          'ended',
+          () => {
+            if (stream.getTracks().every((faixa) => faixa.readyState === 'ended')) removerCartao();
+          },
+          { once: true },
+        );
+        stream.addEventListener('removetrack', () => {
+          if (stream.getTracks().length === 0) removerCartao();
+        });
       };
 
       // Conexao caida tenta ICE restart em vez de desistir: trocar de Wi-Fi
@@ -291,6 +348,7 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
       pares.current.get(parId)?.close();
       pares.current.delete(parId);
       nomesRemotos.current.delete(parId);
+      candidatosPendentes.current.delete(parId);
       setTransmissoes((atuais) => atuais.filter((item) => item.parId !== parId));
       sincronizarParticipantes();
     },
@@ -317,7 +375,7 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
         return;
       }
 
-      enviar({ type: 'stream-ended', streamId: item.stream.id });
+      avisarTodos({ type: 'stream-ended', streamId: item.stream.id });
 
       // Solta a vaga no servidor: sem isto o sender continua apontando para uma
       // faixa parada, o servidor nao ve a transmissao acabar, e quem assiste
@@ -354,6 +412,11 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
         return restantes;
       });
 
+      // No SFU a vaga continua negociada e pode ser reutilizada pela proxima
+      // transmissao. Remover o sender e ofertar daqui colidiria com as ofertas
+      // que o proprio servidor faz quando faixas entram e saem.
+      if (modoSfu.current) return;
+
       // Tira as faixas de cada conexao e renegocia. Sem isto o outro lado
       // continua vendo o ultimo quadro congelado.
       for (const [parId, pc] of pares.current.entries()) {
@@ -371,7 +434,7 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
         await oferecer(parId).catch(() => {});
       }
     },
-    [enviar, oferecer],
+    [avisarTodos, oferecer],
   );
 
   const publicar = useCallback(
@@ -396,12 +459,12 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
 
       locais.current = [...locais.current, item];
 
-      // O navegador avisa por 'ended' quando a pessoa clica em "parar
-      // compartilhamento" na barra dele; 'mute' cobre a tela que fica
-      // indisponivel (troca de usuario, bloqueio).
+      // `ended` e definitivo. `mute` nao e: troca de usuario, tela bloqueada
+      // ou uma pausa curta do driver pode gerar mute seguido de unmute. Parar
+      // tudo no primeiro mute transformava uma oscilacao recuperavel em queda
+      // permanente da voz ou do video.
       for (const faixa of stream.getTracks()) {
         faixa.addEventListener('ended', () => void encerrar(item.id));
-        faixa.addEventListener('mute', () => void encerrar(item.id));
       }
 
       setTransmissoes((atuais) => [...atuais, item]);
@@ -429,6 +492,7 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
         enviarMeta(parId, item);
         await oferecer(parId);
       }
+      return item.id;
     },
     [encerrar, enviarMeta, oferecer],
   );
@@ -448,6 +512,11 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
       setTransmissoes((atuais) => atuais.map((t) => (t.id === id ? atualizada : t)));
 
       for (const [parId, pc] of pares.current.entries()) {
+        if (modoSfu.current) {
+          const vaga = vagaParaEnviar(pc, faixa.kind);
+          if (vaga) await vaga.sender.replaceTrack(faixa);
+          continue;
+        }
         pc.addTrack(faixa, juntas);
         await oferecer(parId).catch(() => {});
       }
@@ -544,7 +613,7 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
           metaRemota.current.set(alvo, meta);
           setTransmissoes((atuais) =>
             atuais.map((item) =>
-              item.id === alvo
+              item.id === alvo || item.streamId === mensagem.streamId
                 ? {
                     ...item,
                     tipo: meta.kind,
@@ -568,10 +637,11 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
           const educado = meuId.current ? mensagem.from < meuId.current : true;
           if (pc.signalingState !== 'stable' && !educado) return;
           if (pc.signalingState !== 'stable' && educado) {
-            await pc.setRemoteDescription({ type: 'rollback' }).catch(() => {});
+            await pc.setLocalDescription({ type: 'rollback' }).catch(() => {});
           }
 
           await pc.setRemoteDescription(mensagem.description);
+          await aplicarCandidatosPendentes(mensagem.from, pc);
 
           // Com o servidor retransmitindo, as m-lines que ele abre para nos
           // PUBLICARMOS ficam marcadas como "podemos enviar" ja na resposta,
@@ -615,36 +685,55 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
           return;
         }
 
-        case 'answer':
-          await pares.current
-            .get(mensagem.from)
-            ?.setRemoteDescription(mensagem.description)
-            .catch(() => {});
+        case 'answer': {
+          const pc = pares.current.get(mensagem.from);
+          if (pc) {
+            await pc.setRemoteDescription(mensagem.description).catch(() => {});
+            await aplicarCandidatosPendentes(mensagem.from, pc);
+          }
           return;
+        }
 
-        case 'ice':
-          await pares.current
-            .get(mensagem.from)
-            ?.addIceCandidate(mensagem.candidate)
-            .catch(() => {
-              // Candidato que chega depois do fechamento, ou antes da
-              // descricao remota. Nenhum dos dois merece derrubar a chamada.
-            });
+        case 'ice': {
+          const pc = pares.current.get(mensagem.from) ?? criarPar(mensagem.from);
+          if (!pc.remoteDescription) {
+            const fila = candidatosPendentes.current.get(mensagem.from) ?? [];
+            fila.push(mensagem.candidate);
+            candidatosPendentes.current.set(mensagem.from, fila);
+            return;
+          }
+          await pc.addIceCandidate(mensagem.candidate).catch(() => {});
           return;
+        }
       }
     },
-    [anotarNome, criarPar, enviar, enviarMeta, oferecer, removerPar],
+    [
+      anotarNome,
+      aplicarCandidatosPendentes,
+      criarPar,
+      enviar,
+      enviarMeta,
+      oferecer,
+      removerPar,
+    ],
   );
 
   const desconectar = useCallback(() => {
+    desconexaoManual.current = true;
+    dadosDaConexao.current = null;
+    tentativasDeReconexao.current = 0;
+    if (timerDeReconexao.current) clearTimeout(timerDeReconexao.current);
     ws.current?.close();
   }, []);
 
   const conectar = useCallback(
-    (servidor: string, sala: string) => {
+    (servidor: string, sala: string, reconexao = false) => {
       const url = normalizarServidor(servidor);
       if (!url) return;
 
+      dadosDaConexao.current = { servidor, sala };
+      desconexaoManual.current = false;
+      if (!reconexao) tentativasDeReconexao.current = 0;
       ws.current?.close();
       if (intervaloDePing.current) clearInterval(intervaloDePing.current);
 
@@ -652,6 +741,7 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
       ws.current = soquete;
 
       soquete.onopen = () => {
+        tentativasDeReconexao.current = 0;
         enviar({ type: 'join', roomId: sala, name: nomeAtual.current });
 
         // O RTT vai junto do ping: quem mede a latencia e o cliente, e o
@@ -671,6 +761,8 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
       };
 
       soquete.onclose = () => {
+        // Socket de uma tentativa antiga fechando depois que outra ja abriu.
+        if (ws.current !== soquete) return;
         if (intervaloDePing.current) clearInterval(intervaloDePing.current);
         setConectado(false);
         setPingMs(0);
@@ -678,9 +770,20 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
         pares.current.clear();
         nomesRemotos.current.clear();
         metaRemota.current.clear();
+        candidatosPendentes.current.clear();
         sincronizarParticipantes();
         // As minhas continuam: sair da sala nao para a captura da minha tela.
         setTransmissoes((atuais) => atuais.filter((item) => item.local));
+
+        const dados = dadosDaConexao.current;
+        if (desconexaoManual.current || !dados) return;
+        const tentativa = ++tentativasDeReconexao.current;
+        const espera = Math.min(1000 * 2 ** (tentativa - 1), 15_000);
+        timerDeReconexao.current = setTimeout(() => {
+          if (!desconexaoManual.current && dadosDaConexao.current) {
+            conectarRef.current(dados.servidor, dados.sala, true);
+          }
+        }, espera);
       };
 
       soquete.onerror = () => {
@@ -690,11 +793,17 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
     [enviar, sincronizarParticipantes, tratarMensagem],
   );
 
+  useEffect(() => {
+    conectarRef.current = conectar;
+  }, [conectar]);
+
   // Fechar a janela com a chamada aberta deixaria as conexoes penduradas do
   // lado do servidor ate o tempo limite dele.
   useEffect(() => {
     return () => {
       if (intervaloDePing.current) clearInterval(intervaloDePing.current);
+      if (timerDeReconexao.current) clearTimeout(timerDeReconexao.current);
+      desconexaoManual.current = true;
       ws.current?.close();
       for (const pc of pares.current.values()) pc.close();
       pares.current.clear();

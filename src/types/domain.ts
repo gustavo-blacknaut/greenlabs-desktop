@@ -95,7 +95,7 @@ export type MensagemEnviada =
       ownerName: string;
       quality: PerfilDeQualidade | null;
     }
-  | { type: 'stream-ended'; streamId: string };
+  | { type: 'stream-ended'; to: IdDePar; streamId: string };
 
 // O que ENTRA e derivado dos esquemas do Zod, e nao escrito de novo aqui:
 // mudar o esquema muda o tipo junto, e nao ha como um ficar para tras.

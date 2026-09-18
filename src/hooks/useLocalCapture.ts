@@ -78,26 +78,21 @@ export function useLocalCapture(chamada: Chamada): UsoDeCaptura {
       if (!faixaDeVideo) return;
 
       const stream = new MediaStream([faixaDeVideo]);
-      await chamada.publicar('screen', `Tela - ${qualidade.rotulo}`, stream, qualidade);
+      const idPublicado = await chamada.publicar(
+        'screen',
+        `Tela - ${qualidade.rotulo}`,
+        stream,
+        qualidade,
+      );
       if (!comAudio) return;
 
       // O video ja esta no ar; o audio entra quando abrir. Esperar por ele
       // aqui atrasaria a imagem em segundos, e a captura por processo demora
       // justamente porque precisa achar as sessoes de audio a excluir.
-      const publicada = chamada.transmissoes.find(
-        (t) => t.local && t.stream.getVideoTracks()[0] === faixaDeVideo,
-      );
-
       void (async () => {
         try {
           const { faixa, encerrar } = await abrirAudioDoSistema();
-          const alvo = publicada?.id;
-          if (!alvo) {
-            encerrar();
-            return;
-          }
-
-          await chamada.anexarFaixa(alvo, faixa);
+          await chamada.anexarFaixa(idPublicado, faixa);
 
           const limpar = () => encerrar();
           faixa.addEventListener('ended', limpar);
