@@ -42,11 +42,25 @@ jobs:
       - name: Linux
         if: runner.os == 'Linux'
         run: npx electron-builder --linux --x64 --publish never -c.directories.output=dist-installer
-      - uses: softprops/action-gh-release@v2
+      - uses: actions/upload-artifact@v4
         with:
-          files: |
+          name: desktop-${{ matrix.os }}
+          path: |
             dist-installer/*.exe
             dist-installer/*.tar.gz
             dist-installer/*.deb
             dist-installer/*.AppImage
+          if-no-files-found: error
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          merge-multiple: true
+          path: release
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
           generate_release_notes: true
