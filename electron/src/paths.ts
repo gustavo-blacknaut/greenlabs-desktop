@@ -34,7 +34,9 @@ export const caminhos = {
   audioCapture: foraDoAsar('AudioCapture.exe'),
 
   /** Servidor de sinalizacao em Go, para a aba Hospedar. */
-  sinalizacao: foraDoAsar(
+  sinalizacao: app.isPackaged ? path.join(process.resourcesPath, 'server',
+    process.platform === 'win32' ? 'greenlabs-signaling.exe' : 'greenlabs-signaling',
+  ) : foraDoAsar(
     process.platform === 'win32' ? 'greenlabs-signaling.exe' : 'greenlabs-signaling',
   ),
 

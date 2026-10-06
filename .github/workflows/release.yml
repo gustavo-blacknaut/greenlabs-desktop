@@ -1,0 +1,52 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/checkout@v4
+        with:
+          repository: gustavo-blacknaut/greenlabs-server
+          ref: v0.3.9
+          path: release/server-source
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: release/server-source/go.mod
+          cache-dependency-path: release/server-source/go.sum
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Servidor incorporado
+        shell: bash
+        run: |
+          mkdir -p release/server
+          nome=greenlabs-signaling
+          if [ "$RUNNER_OS" = Windows ]; then nome="$nome.exe"; fi
+          cd release/server-source
+          CGO_ENABLED=0 go build -trimpath -ldflags '-s -w -X main.versao=v0.3.9' -o "../server/$nome" ./src
+      - run: npm run build
+      - name: Windows
+        if: runner.os == 'Windows'
+        run: npx electron-builder --win nsis portable --x64 --publish never '-c.directories.output=dist-installer'
+      - name: Linux
+        if: runner.os == 'Linux'
+        run: npx electron-builder --linux --x64 --publish never -c.directories.output=dist-installer
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist-installer/*.exe
+            dist-installer/*.tar.gz
+            dist-installer/*.deb
+            dist-installer/*.AppImage
+          generate_release_notes: true

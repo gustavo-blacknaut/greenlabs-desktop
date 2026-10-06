@@ -124,10 +124,12 @@ function subirServidorEmGo(porta: number): Promise<ChildProcess> {
       reject(erro);
     }
 
+    let respostaInicial = '';
     processo.stdout?.on('data', (bloco: Buffer) => {
       const texto = bloco.toString();
-      process.stdout.write(`[host] ${texto}`);
-      if (!decidido && texto.includes('rodando em')) {
+      if (process.env.GREENLABS_DEBUG === '1') process.stdout.write(`[host] ${texto}`);
+      if (!decidido) respostaInicial = (respostaInicial + texto).slice(-1024);
+      if (!decidido && respostaInicial.includes('rodando em')) {
         decidido = true;
         clearTimeout(prazo);
         resolve(processo);
@@ -170,7 +172,9 @@ export async function iniciar({ port, tunnel }: OpcoesDeHospedagem): Promise<Est
     const reserva = await carregar<ModuloDeSinalizacao>('signaling.js');
     servidorEmProcesso = await reserva.startSignaling({
       port: porta,
-      log: (mensagem) => console.log('[host]', mensagem),
+      log: (mensagem) => {
+        if (process.env.GREENLABS_DEBUG === '1') console.log('[host]', mensagem);
+      },
     });
   }
 

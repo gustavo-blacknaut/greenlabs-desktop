@@ -552,10 +552,17 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
         }
 
         case 'room-pings':
-          setPingsDaSala(mensagem.pings ?? {});
+          setPingsDaSala((anteriores) => {
+            const novos = mensagem.pings ?? {};
+            const ids = Object.keys(novos);
+            if (ids.length === Object.keys(anteriores).length &&
+                ids.every((id) => anteriores[id] === novos[id])) return anteriores;
+            return novos;
+          });
           return;
 
         case 'joined': {
+          tentativasDeReconexao.current = 0;
           meuId.current = mensagem.peerId;
           setConectado(true);
           modoSfu.current = mensagem.sfu === true;
@@ -741,7 +748,7 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
       ws.current = soquete;
 
       soquete.onopen = () => {
-        tentativasDeReconexao.current = 0;
+        if (ws.current !== soquete) { soquete.close(); return; }
         enviar({ type: 'join', roomId: sala, name: nomeAtual.current });
 
         // O RTT vai junto do ping: quem mede a latencia e o cliente, e o
@@ -753,11 +760,14 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
       };
 
       soquete.onmessage = (evento) => {
+        if (ws.current !== soquete) return;
         // Validado antes de entrar, e nao convertido com um `as`: o servidor
         // pode ser de outra versao, e uma mensagem que este cliente nao entende
         // nao pode virar campo indefinido tres camadas adiante.
         const mensagem = lerMensagem(String(evento.data));
-        if (mensagem) void tratarMensagem(mensagem);
+        if (mensagem) void tratarMensagem(mensagem).catch(() => {
+          if (ws.current === soquete) soquete.close();
+        });
       };
 
       soquete.onclose = () => {
@@ -778,7 +788,7 @@ export function useChamada({ nome, aoEncerrarTelaLocal }: OpcoesDaChamada): Cham
         const dados = dadosDaConexao.current;
         if (desconexaoManual.current || !dados) return;
         const tentativa = ++tentativasDeReconexao.current;
-        const espera = Math.min(1000 * 2 ** (tentativa - 1), 15_000);
+        const espera = Math.min(1000 * 2 ** (tentativa - 1), 15_000) * (0.8 + Math.random() * 0.4);
         timerDeReconexao.current = setTimeout(() => {
           if (!desconexaoManual.current && dadosDaConexao.current) {
             conectarRef.current(dados.servidor, dados.sala, true);

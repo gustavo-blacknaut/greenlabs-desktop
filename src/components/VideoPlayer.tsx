@@ -17,12 +17,17 @@ export function VideoPlayer({ stream, mudo = false, volume = 1, className = '' }
   const ref = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    if (ref.current) ref.current.srcObject = stream;
+    const video = ref.current;
+    if (!video) return;
+    if (video.srcObject !== stream) video.srcObject = stream;
+    return () => {
+      video.srcObject = null;
+    };
   }, [stream]);
 
   useEffect(() => {
     if (!ref.current) return;
-    ref.current.volume = volume;
+    ref.current.volume = Number.isFinite(volume) ? Math.min(1, Math.max(0, volume)) : 1;
     ref.current.muted = mudo;
   }, [mudo, volume]);
 
